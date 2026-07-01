@@ -164,7 +164,21 @@ This protects recipient privacy, enables per-recipient personalization, and allo
 
 Campaign-level records answer “what was sent as a batch.” Recipient-level records answer “what happened to this one email.”
 
-## 6. MVP Functional Scope
+## 6. Database Recommendation
+
+Use **PostgreSQL** as the default database for Rococo Outreach.
+
+Reasons:
+
+- The product data is relational: contacts, drafts, campaigns, recipients, attachments, statuses, and send records all have clear relationships.
+- PostgreSQL handles transactional writes well, which matters when creating a campaign and many recipient records together.
+- Recipient-level status tracking, retry logic, reporting, filtering, and audit history fit a relational schema better than a document-only model.
+- Rococo's existing main app already uses Prisma/PostgreSQL, so the team can reuse existing schema, migration, deployment, and operational experience.
+- PostgreSQL still supports flexible fields through JSON/JSONB for metadata such as tags, provider payloads, email events, and future integration details.
+
+Do not use MongoDB for the first version unless the product direction changes toward unstructured event ingestion as the main workload. Do not choose MySQL unless there is a hosting or team constraint that makes it clearly cheaper or easier than PostgreSQL.
+
+## 7. MVP Functional Scope
 
 ### Contacts
 
@@ -219,7 +233,7 @@ Do not allow arbitrary unsafe HTML. Generate a plain-text fallback from the HTML
 - Show recipient-level statuses.
 - Allow retry only for failed recipients in a later version.
 
-## 7. Recommended Implementation Phases
+## 8. Recommended Implementation Phases
 
 ### Phase 1: Safe MVP
 
@@ -255,7 +269,7 @@ Do not allow arbitrary unsafe HTML. Generate a plain-text fallback from the HTML
 - Rate limits and send queue.
 - Audit log.
 
-## 8. Sending Provider Recommendation
+## 9. Sending Provider Recommendation
 
 Use Resend for the first version.
 
@@ -276,7 +290,7 @@ for (const recipient of recipients) {
 
 The `to` array should contain only one email address per send call.
 
-## 9. Safety, Rollback, and Operational Rules
+## 10. Safety, Rollback, and Operational Rules
 
 Email cannot be recalled after being sent, so prevention matters more than rollback.
 
@@ -300,7 +314,7 @@ Rollback behavior:
 - Mark campaign as `cancelled` or `partial_failed`.
 - Retry failed recipients manually later.
 
-## 10. Risks
+## 11. Risks
 
 - Privacy leak if multiple recipients are placed in one `To` or `CC` field.
 - Accidental send to wrong recipients.
@@ -310,7 +324,7 @@ Rollback behavior:
 - Attachment size/type failures.
 - Reply tracking requires inbound email or mailbox integration and should not block MVP.
 
-## 11. First Product Boundary Decision
+## 12. First Product Boundary Decision
 
 Recommended first boundary: admin/internal tool only.
 
