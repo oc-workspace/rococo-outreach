@@ -4,7 +4,6 @@ services:
       context: .
       dockerfile: Dockerfile
     image: rococo-outreach:dev
-    container_name: rococo-outreach-dev
     restart: unless-stopped
     env_file:
       - .env
