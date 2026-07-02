@@ -233,7 +233,80 @@ Do not allow arbitrary unsafe HTML. Generate a plain-text fallback from the HTML
 - Show recipient-level statuses.
 - Allow retry only for failed recipients in a later version.
 
-## 8. Recommended Implementation Phases
+## 8. Functional Version Plan
+
+### MVP Version
+
+This is the first version that can be used end-to-end. It should include:
+
+- Email contact CRUD.
+- Create a new outreach email campaign.
+- Manually add multiple recipient rows.
+- Rich-text editor.
+- Preview the final email.
+- Send through Resend or SMTP in one-recipient-per-send mode.
+- Record send success and failure.
+
+### Version 2
+
+This version improves efficiency after the basic flow is usable:
+
+- Contact search, filtering, and tags.
+- Bulk select contacts from the contact library.
+- Variable replacement:
+  - `{{salutation}}`
+  - `{{company}}`
+  - `{{mediaName}}`
+  - `{{language}}`
+- Reusable email templates.
+- Retry failed sends.
+- Attachment management.
+
+### Version 3
+
+This version adds operational and growth controls:
+
+- Reply tracking.
+- Bounce and unsubscribe handling.
+- Open-rate and click-rate tracking.
+- Multilingual templates.
+- Sending frequency limits.
+- Queue system.
+- Permissions and audit logs.
+
+## 9. Architecture Development Slices
+
+### Slice 1: Frontend Safe MVP
+
+Current deployed slice: a usable frontend workflow prototype with explicit safety states.
+
+- Contacts, campaign draft, recipient rows, preview, and history are modeled in frontend state.
+- Send behavior is simulated but follows the one-recipient-per-send rule.
+- Preview, test-send, second confirmation, duplicate checks, blocked-contact warnings, and per-recipient warnings are already represented in the UI model.
+- This slice validates the user workflow and UI state model before persistence and provider integration.
+
+### Slice 2: PostgreSQL Persistence
+
+Next architecture slice: move from local frontend state to persistent API-backed data.
+
+- Add Prisma and PostgreSQL schema.
+- Add models for `EmailContact`, `EmailDraft`, `EmailCampaign`, and `EmailCampaignRecipient`.
+- Add Contacts CRUD API.
+- Persist Draft / Campaign / Recipient records.
+- Move frontend data flow from local state to API-backed loading, saving, empty, error, and success states.
+- Read History from the database.
+- Keep preview, test-send, second confirmation, and one-by-one send safety gates unchanged.
+
+### Slice 3: Real Sending Provider
+
+After persistence is stable, connect real delivery.
+
+- Add Resend or SMTP provider integration.
+- Keep one independent send call per recipient.
+- Store provider message IDs and provider errors on recipient records.
+- Do not enable large-volume sending until rate limits and operational safeguards exist.
+
+## 10. Recommended Implementation Phases
 
 ### Phase 1: Safe MVP
 
@@ -269,7 +342,7 @@ Do not allow arbitrary unsafe HTML. Generate a plain-text fallback from the HTML
 - Rate limits and send queue.
 - Audit log.
 
-## 9. Sending Provider Recommendation
+## 11. Sending Provider Recommendation
 
 Use Resend for the first version.
 
@@ -290,7 +363,7 @@ for (const recipient of recipients) {
 
 The `to` array should contain only one email address per send call.
 
-## 10. Safety, Rollback, and Operational Rules
+## 12. Safety, Rollback, and Operational Rules
 
 Email cannot be recalled after being sent, so prevention matters more than rollback.
 
@@ -314,7 +387,7 @@ Rollback behavior:
 - Mark campaign as `cancelled` or `partial_failed`.
 - Retry failed recipients manually later.
 
-## 11. Risks
+## 13. Risks
 
 - Privacy leak if multiple recipients are placed in one `To` or `CC` field.
 - Accidental send to wrong recipients.
@@ -324,7 +397,7 @@ Rollback behavior:
 - Attachment size/type failures.
 - Reply tracking requires inbound email or mailbox integration and should not block MVP.
 
-## 12. First Product Boundary Decision
+## 14. First Product Boundary Decision
 
 Recommended first boundary: admin/internal tool only.
 
