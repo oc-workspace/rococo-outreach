@@ -1,12 +1,12 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CampaignBuilder } from './CampaignBuilder';
 import { ContactPanel } from './ContactPanel';
 import { HistoryPanel } from './HistoryPanel';
 import { PreviewPanel } from './PreviewPanel';
 import { RecipientRows } from './RecipientRows';
-import { initialDraft, initialRecipients, seedContacts } from '@/lib/outreach/seed';
+import { initialDraft, initialRecipients } from '@/lib/outreach/seed';
 import { hasDuplicateRecipients, renderRecipientEmail } from '@/lib/outreach/render';
 import { sendCampaignOneByOne } from '@/lib/outreach/send';
 import type { CampaignRecord, EmailContact, EmailDraft, RecipientRow } from '@/lib/outreach/types';
@@ -18,8 +18,18 @@ function newId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+async function parseContactResponse(response: Response) {
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(payload?.error ?? 'Contact request failed');
+  }
+  return payload?.data as EmailContact;
+}
+
 export function OutreachApp() {
-  const [contacts, setContacts] = useState(seedContacts);
+  const [contacts, setContacts] = useState<EmailContact[]>([]);
+  const [contactsLoading, setContactsLoading] = useState(true);
+  const [contactsError, setContactsError] = useState<string | null>(null);
   const [contactQuery, setContactQuery] = useState('');
   const [campaignName, setCampaignName] = useState('July media outreach');
   const [draft, setDraft] = useState<EmailDraft>(initialDraft);
@@ -28,6 +38,31 @@ export function OutreachApp() {
   const [testSent, setTestSent] = useState(false);
   const [confirmArmed, setConfirmArmed] = useState(false);
   const [campaigns, setCampaigns] = useState<CampaignRecord[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadContacts() {
+      setContactsLoading(true);
+      setContactsError(null);
+      try {
+        const response = await fetch('/api/contacts', { cache: 'no-store' });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok) throw new Error(payload?.error ?? 'Failed to load contacts');
+        if (!cancelled) setContacts(payload?.data ?? []);
+      } catch (error) {
+        if (!cancelled) setContactsError(error instanceof Error ? error.message : 'Failed to load contacts');
+      } finally {
+        if (!cancelled) setContactsLoading(false);
+      }
+    }
+
+    loadContacts();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const filteredContacts = useMemo(() => {
     const needle = contactQuery.trim().toLowerCase();
@@ -46,20 +81,53 @@ export function OutreachApp() {
     setConfirmArmed(false);
   }
 
-  function addContact() {
-    const now = new Date().toISOString();
-    setContacts((current) => [{ id: newId('contact'), email: '', displayName: '', salutation: '', language: 'en', company: '', mediaName: '', role: '', country: '', tags: [], notes: '', status: 'active', createdAt: now, updatedAt: now }, ...current]);
+  async function addContact() {
+    setContactsError(null);
+    try {
+      const response = await fetch('/api/contacts', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email: '', displayName: '', salutation: '', language: 'en', company: '', mediaName: '', role: '', country: '', tags: [], notes: '', status: 'active' }),
+      });
+      const contact = await parseContactResponse(response);
+      setContacts((current) => [contact, ...current]);
+    } catch (error) {
+      setContactsError(error instanceof Error ? error.message : 'Failed to add contact');
+    }
   }
 
-  function updateContact(id: string, patch: Partial<EmailContact>) {
+  async function updateContact(id: string, patch: Partial<EmailContact>) {
+    setContactsError(null);
     setContacts((current) => current.map((contact) => contact.id === id ? { ...contact, ...patch, updatedAt: new Date().toISOString() } : contact));
     resetSendGuards();
+
+    try {
+      const response = await fetch(`/api/contacts/${id}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+      const contact = await parseContactResponse(response);
+      setContacts((current) => current.map((item) => item.id === id ? contact : item));
+    } catch (error) {
+      setContactsError(error instanceof Error ? error.message : 'Failed to update contact');
+    }
   }
 
-  function removeContact(id: string) {
+  async function removeContact(id: string) {
+    const previousContacts = contacts;
+    setContactsError(null);
     setContacts((current) => current.filter((contact) => contact.id !== id));
     setRows((current) => current.map((row) => row.contactId === id ? { ...row, contactId: '' } : row));
     resetSendGuards();
+
+    try {
+      const response = await fetch(`/api/contacts/${id}`, { method: 'DELETE' });
+      if (!response.ok) throw new Error('Failed to remove contact');
+    } catch (error) {
+      setContacts(previousContacts);
+      setContactsError(error instanceof Error ? error.message : 'Failed to remove contact');
+    }
   }
 
   function updateDraft(patch: Partial<EmailDraft>) {
@@ -101,7 +169,7 @@ export function OutreachApp() {
 
   return (
     <main className="appShell">
-      <header className="topbar"><div className="topbarInner"><div><h1 className="brandTitle">Rococo Outreach</h1><p className="brandSub">Internal small-batch email outreach workspace</p></div><div className="statusStrip"><span className="pill pillStrong">{contacts.length} contacts</span><span className="pill pillStrong">{rows.length} recipients</span><span className="pill">one-by-one send only</span></div></div></header>
+      <header className="topbar"><div className="topbarInner"><div><h1 className="brandTitle">Rococo Outreach</h1><p className="brandSub">Internal small-batch email outreach workspace</p></div><div className="statusStrip"><span className="pill pillStrong">{contactsLoading ? 'loading contacts' : `${contacts.length} contacts`}</span><span className="pill pillStrong">{rows.length} recipients</span><span className="pill">one-by-one send only</span>{contactsError && <span className="pill statusBlocked">{contactsError}</span>}</div></div></header>
       <div className="mainGrid">
         <div className="leftColumn"><ContactPanel contacts={filteredContacts} query={contactQuery} onQueryChange={setContactQuery} onAddContact={addContact} onUpdateContact={updateContact} onRemoveContact={removeContact} /><HistoryPanel campaigns={campaigns} /></div>
         <div className="rightColumn"><div className="stack"><CampaignBuilder campaignName={campaignName} draft={draft} onCampaignNameChange={(value) => { setCampaignName(value); resetSendGuards(); }} onDraftChange={updateDraft} /><RecipientRows rows={rows} contacts={contacts} hasDuplicate={duplicateRecipients} onAddRow={addRow} onRemoveRow={removeRow} onUpdateRow={updateRow} /></div><PreviewPanel renderedEmails={renderedEmails} previewed={previewed} testSent={testSent} canSend={canSend} confirmArmed={confirmArmed} onPreview={previewCampaign} onTestSend={testSend} onArmConfirm={() => setConfirmArmed(true)} onRealSend={realSend} /></div>
