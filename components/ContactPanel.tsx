@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { ContactStatus, EmailContact } from '@/lib/outreach/types';
 
 interface Props {
@@ -6,14 +6,21 @@ interface Props {
   query: string;
   onQueryChange: (value: string) => void;
   onAddContact: () => void;
+  newlySavedContactId?: string | null;
   onUpdateContact: (id: string, patch: Partial<EmailContact>) => void;
   onRemoveContact: (id: string) => void;
 }
 
 const statusOptions: ContactStatus[] = ['active', 'inactive', 'blocked'];
 
-export function ContactPanel({ contacts, query, onQueryChange, onAddContact, onUpdateContact, onRemoveContact }: Props) {
+export function ContactPanel({ contacts, query, onQueryChange, onAddContact, newlySavedContactId, onUpdateContact, onRemoveContact }: Props) {
   const [expandedContactId, setExpandedContactId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (newlySavedContactId) {
+      setExpandedContactId(newlySavedContactId);
+    }
+  }, [newlySavedContactId]);
 
   function toggleDetail(contactId: string) {
     setExpandedContactId((current) => (current === contactId ? null : contactId));
@@ -55,6 +62,7 @@ export function ContactPanel({ contacts, query, onQueryChange, onAddContact, onU
                 </div>
                 {isExpanded && (
                   <div className="contactDetailPanel">
+                    {newlySavedContactId === contact.id && <div className="successBanner">已保存,请继续编辑信息</div>}
                     <div className="row">
                       <div className="field"><label>Email</label><input className="input" value={contact.email} onChange={(event) => onUpdateContact(contact.id, { email: event.target.value })} placeholder="email" /></div>
                       <div className="field"><label>Name</label><input className="input" value={contact.displayName} onChange={(event) => onUpdateContact(contact.id, { displayName: event.target.value })} placeholder="display name" /></div>

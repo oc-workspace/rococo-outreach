@@ -33,6 +33,7 @@ export function OutreachApp() {
   const [contactsLoading, setContactsLoading] = useState(true);
   const [contactsError, setContactsError] = useState<string | null>(null);
   const [contactQuery, setContactQuery] = useState('');
+  const [newlySavedContactId, setNewlySavedContactId] = useState<string | null>(null);
   const [campaignName, setCampaignName] = useState('July media outreach');
   const [draft, setDraft] = useState<EmailDraft>(initialDraft);
   const [rows, setRows] = useState<RecipientRow[]>(initialRecipients);
@@ -93,6 +94,8 @@ export function OutreachApp() {
       });
       const contact = await parseContactResponse(response);
       setContacts((current) => [contact, ...current]);
+      setNewlySavedContactId(contact.id);
+      setContactQuery('');
     } catch (error) {
       setContactsError(error instanceof Error ? error.message : 'Failed to add contact');
     }
@@ -100,6 +103,7 @@ export function OutreachApp() {
 
   async function updateContact(id: string, patch: Partial<EmailContact>) {
     setContactsError(null);
+    setNewlySavedContactId((current) => (current === id ? null : current));
     setContacts((current) => current.map((contact) => contact.id === id ? { ...contact, ...patch, updatedAt: new Date().toISOString() } : contact));
     resetSendGuards();
 
@@ -210,7 +214,7 @@ export function OutreachApp() {
 
         {activeTab === 'contacts' && (
           <section className="tabPane tabPaneWide">
-            <ContactPanel contacts={filteredContacts} query={contactQuery} onQueryChange={setContactQuery} onAddContact={addContact} onUpdateContact={updateContact} onRemoveContact={removeContact} />
+            <ContactPanel contacts={filteredContacts} query={contactQuery} onQueryChange={setContactQuery} onAddContact={addContact} newlySavedContactId={newlySavedContactId} onUpdateContact={updateContact} onRemoveContact={removeContact} />
           </section>
         )}
 
