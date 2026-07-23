@@ -23,6 +23,6 @@ export const initialRecipients: RecipientRow[] = [
 ];
 
 export const allowedSenders: EmailSender[] = [
-  { id: 'pp-employee-1', displayName: 'Employee Name 1', email: 'employeename1@pp.com', domain: 'pp.com', domainVerified: true, senderVerified: true, status: 'active' },
-  { id: 'pp-employee-2', displayName: 'Employee Name 2', email: 'employeename2@pp.com', domain: 'pp.com', domainVerified: true, senderVerified: true, status: 'active' },
+  { id: 'pp-employee-1', displayName: 'Employee Name 1', email: 'employeename1@pp.com', domain: 'pp.com', domainVerified: true, senderVerified: true, status: 'active', createdAt: now, updatedAt: now },
+  { id: 'pp-employee-2', displayName: 'Employee Name 2', email: 'employeename2@pp.com', domain: 'pp.com', domainVerified: true, senderVerified: true, status: 'active', createdAt: now, updatedAt: now },
 ];

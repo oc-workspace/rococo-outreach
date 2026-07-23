@@ -47,6 +47,8 @@ export interface EmailSender {
   domainVerified: boolean;
   senderVerified: boolean;
   status: SenderStatus;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface RenderedEmail {
