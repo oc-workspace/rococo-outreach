@@ -9,7 +9,9 @@ import { RecipientRows } from './RecipientRows';
 import { initialDraft, initialRecipients } from '@/lib/outreach/seed';
 import { hasDuplicateRecipients, renderRecipientEmail } from '@/lib/outreach/render';
 import { sendCampaignOneByOne } from '@/lib/outreach/send';
+import { validateCampaignSend } from '@/lib/outreach/validation';
 import type { CampaignRecord, EmailContact, EmailDraft, RecipientRow } from '@/lib/outreach/types';
+import type { SendValidationError, SendValidationMode } from '@/lib/outreach/validation';
 
 const senderEmail = 'noreply@rococo.dev';
 const senderName = 'Rococo';
@@ -38,6 +40,8 @@ export function OutreachApp() {
   const [draft, setDraft] = useState<EmailDraft>(initialDraft);
   const [rows, setRows] = useState<RecipientRow[]>(initialRecipients);
   const [previewed, setPreviewed] = useState(false);
+  const [testRecipientEmail, setTestRecipientEmail] = useState('');
+  const [validationErrors, setValidationErrors] = useState<SendValidationError[]>([]);
   const [testSent, setTestSent] = useState(false);
   const [confirmArmed, setConfirmArmed] = useState(false);
   const [campaigns, setCampaigns] = useState<CampaignRecord[]>([]);
@@ -75,13 +79,26 @@ export function OutreachApp() {
 
   const renderedEmails = useMemo(() => rows.map((row) => renderRecipientEmail(draft, row, contacts)), [contacts, draft, rows]);
   const duplicateRecipients = hasDuplicateRecipients(rows);
-  const warningCount = renderedEmails.reduce((sum, email) => sum + email.warnings.length, 0);
-  const canSend = previewed && !duplicateRecipients && warningCount === 0 && renderedEmails.length > 0;
 
   function resetSendGuards() {
     setPreviewed(false);
     setTestSent(false);
     setConfirmArmed(false);
+    setValidationErrors([]);
+  }
+
+  function getSendValidationErrors(mode: SendValidationMode) {
+    return validateCampaignSend({
+      campaignName,
+      draft,
+      rows,
+      contacts,
+      senderEmail,
+      senderName,
+      previewed,
+      testRecipientEmail,
+      mode,
+    });
   }
 
   async function addContact() {
@@ -158,16 +175,28 @@ export function OutreachApp() {
 
   function previewCampaign() {
     setPreviewed(true);
+    setValidationErrors([]);
     setConfirmArmed(false);
   }
 
   function testSend() {
-    if (!previewed) return;
+    const errors = getSendValidationErrors('test');
+    setValidationErrors(errors);
+    if (errors.length > 0) return;
     setTestSent(true);
   }
 
+  function armConfirm() {
+    const errors = getSendValidationErrors('real');
+    setValidationErrors(errors);
+    if (errors.length > 0) return;
+    setConfirmArmed(true);
+  }
+
   function realSend() {
-    if (!canSend) return;
+    const errors = getSendValidationErrors('real');
+    setValidationErrors(errors);
+    if (errors.length > 0) return;
     const campaign = sendCampaignOneByOne({ name: campaignName, draft, renderedEmails, senderEmail, senderName });
     setCampaigns((current) => [campaign, ...current]);
     setConfirmArmed(false);
@@ -231,7 +260,7 @@ export function OutreachApp() {
               <RecipientRows rows={rows} contacts={contacts} hasDuplicate={duplicateRecipients} onAddRow={addRow} onRemoveRow={removeRow} onUpdateRow={updateRow} />
             </div>
             <div className="composeRight">
-              <PreviewPanel renderedEmails={renderedEmails} previewed={previewed} testSent={testSent} canSend={canSend} confirmArmed={confirmArmed} onPreview={previewCampaign} onTestSend={testSend} onArmConfirm={() => setConfirmArmed(true)} onRealSend={realSend} />
+              <PreviewPanel renderedEmails={renderedEmails} previewed={previewed} testSent={testSent} confirmArmed={confirmArmed} validationErrors={validationErrors} testRecipientEmail={testRecipientEmail} onTestRecipientEmailChange={(value) => { setTestRecipientEmail(value); setValidationErrors([]); setTestSent(false); }} onPreview={previewCampaign} onTestSend={testSend} onArmConfirm={armConfirm} onRealSend={realSend} />
             </div>
           </section>
         )}
