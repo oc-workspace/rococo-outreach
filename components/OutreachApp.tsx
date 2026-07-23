@@ -7,11 +7,11 @@ import { HistoryPanel } from './HistoryPanel';
 import { PreviewPanel } from './PreviewPanel';
 import { RecipientRows } from './RecipientRows';
 import { SenderSettings } from './SenderSettings';
-import { allowedSenders, initialDraft, initialRecipients } from '@/lib/outreach/seed';
+import { initialDraft, initialRecipients } from '@/lib/outreach/seed';
 import { hasDuplicateRecipients, renderRecipientEmail } from '@/lib/outreach/render';
 import { sendCampaignOneByOne } from '@/lib/outreach/send';
 import { validateCampaignSend } from '@/lib/outreach/validation';
-import type { CampaignRecord, EmailContact, EmailDraft, RecipientRow } from '@/lib/outreach/types';
+import type { CampaignRecord, EmailContact, EmailDraft, EmailSender, RecipientRow } from '@/lib/outreach/types';
 import type { SendValidationError, SendValidationMode } from '@/lib/outreach/validation';
 
 type WorkspaceTab = 'contacts' | 'campaign' | 'compose';
@@ -36,8 +36,11 @@ export function OutreachApp() {
   const [contactQuery, setContactQuery] = useState('');
   const [newlySavedContactId, setNewlySavedContactId] = useState<string | null>(null);
   const [campaignName, setCampaignName] = useState('July media outreach');
-  const [selectedSenderId, setSelectedSenderId] = useState(allowedSenders[0]?.id || '');
-  const [replyToEmail, setReplyToEmail] = useState(allowedSenders[0]?.email || '');
+  const [senders, setSenders] = useState<EmailSender[]>([]);
+  const [sendersLoading, setSendersLoading] = useState(true);
+  const [sendersError, setSendersError] = useState<string | null>(null);
+  const [selectedSenderId, setSelectedSenderId] = useState('');
+  const [replyToEmail, setReplyToEmail] = useState('');
   const [draft, setDraft] = useState<EmailDraft>(initialDraft);
   const [rows, setRows] = useState<RecipientRow[]>(initialRecipients);
   const [previewed, setPreviewed] = useState(false);
@@ -72,6 +75,36 @@ export function OutreachApp() {
     };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSenders() {
+      setSendersLoading(true);
+      setSendersError(null);
+      try {
+        const response = await fetch('/api/senders', { cache: 'no-store' });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok) throw new Error(payload?.error ?? 'Failed to load senders');
+        const nextSenders = payload?.data ?? [];
+        if (!cancelled) {
+          setSenders(nextSenders);
+          setSelectedSenderId((current) => current || nextSenders[0]?.id || '');
+          setReplyToEmail((current) => current || nextSenders[0]?.email || '');
+        }
+      } catch (error) {
+        if (!cancelled) setSendersError(error instanceof Error ? error.message : 'Failed to load senders');
+      } finally {
+        if (!cancelled) setSendersLoading(false);
+      }
+    }
+
+    loadSenders();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const filteredContacts = useMemo(() => {
     const needle = contactQuery.trim().toLowerCase();
     if (!needle) return contacts;
@@ -79,7 +112,7 @@ export function OutreachApp() {
   }, [contacts, contactQuery]);
 
   const renderedEmails = useMemo(() => rows.map((row) => renderRecipientEmail(draft, row, contacts)), [contacts, draft, rows]);
-  const selectedSender = allowedSenders.find((sender) => sender.id === selectedSenderId);
+  const selectedSender = senders.find((sender) => sender.id === selectedSenderId);
   const senderEmail = selectedSender?.email || '';
   const senderName = selectedSender?.displayName || '';
   const duplicateRecipients = hasDuplicateRecipients(rows);
@@ -212,7 +245,7 @@ export function OutreachApp() {
   }
 
   function updateSender(senderId: string) {
-    const nextSender = allowedSenders.find((sender) => sender.id === senderId);
+    const nextSender = senders.find((sender) => sender.id === senderId);
     setSelectedSenderId(senderId);
     setReplyToEmail(nextSender?.email || '');
     resetSendGuards();
@@ -235,8 +268,10 @@ export function OutreachApp() {
           <div className="statusStrip">
             <span className="pill pillStrong">{contactsLoading ? 'loading contacts' : `${contacts.length} contacts`}</span>
             <span className="pill pillStrong">{rows.length} recipients</span>
+            <span className="pill pillStrong">{sendersLoading ? 'loading senders' : `${senders.length} senders`}</span>
             <span className="pill">one-by-one send only</span>
             {contactsError && <span className="pill statusBlocked">{contactsError}</span>}
+            {sendersError && <span className="pill statusBlocked">{sendersError}</span>}
           </div>
         </div>
       </header>
@@ -271,7 +306,7 @@ export function OutreachApp() {
         {activeTab === 'compose' && (
           <section className="tabPane composeGrid">
             <div className="composeLeft">
-              <SenderSettings senders={allowedSenders} selectedSenderId={selectedSenderId} replyToEmail={replyToEmail} onSenderChange={updateSender} onReplyToEmailChange={(value) => { setReplyToEmail(value); resetSendGuards(); }} />
+              <SenderSettings senders={senders} selectedSenderId={selectedSenderId} replyToEmail={replyToEmail} loading={sendersLoading} error={sendersError} onSenderChange={updateSender} onReplyToEmailChange={(value) => { setReplyToEmail(value); resetSendGuards(); }} />
               <CampaignBuilder campaignName={campaignName} draft={draft} onCampaignNameChange={(value) => { setCampaignName(value); resetSendGuards(); }} onDraftChange={updateDraft} />
               <RecipientRows rows={rows} contacts={contacts} hasDuplicate={duplicateRecipients} onAddRow={addRow} onRemoveRow={removeRow} onUpdateRow={updateRow} />
             </div>

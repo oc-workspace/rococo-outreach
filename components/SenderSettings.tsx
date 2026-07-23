@@ -5,6 +5,8 @@ interface Props {
   selectedSenderId: string;
   replyToEmail: string;
   onSenderChange: (senderId: string) => void;
+  loading: boolean;
+  error: string | null;
   onReplyToEmailChange: (value: string) => void;
 }
 
@@ -12,7 +14,7 @@ function senderLabel(sender: EmailSender) {
   return sender.displayName + ' <' + sender.email + '>';
 }
 
-export function SenderSettings({ senders, selectedSenderId, replyToEmail, onSenderChange, onReplyToEmailChange }: Props) {
+export function SenderSettings({ senders, selectedSenderId, replyToEmail, loading, error, onSenderChange, onReplyToEmailChange }: Props) {
   const selectedSender = senders.find((sender) => sender.id === selectedSenderId);
   const isVerified = Boolean(selectedSender?.domainVerified && selectedSender.senderVerified && selectedSender.status === 'active');
 
@@ -26,9 +28,12 @@ export function SenderSettings({ senders, selectedSenderId, replyToEmail, onSend
         {selectedSender && <span className={isVerified ? 'pill statusActive' : 'pill statusBlocked'}>{isVerified ? 'Verified' : 'Not verified'}</span>}
       </div>
       <div className="panelBody stack">
+        {loading && <div className="empty">Loading senders...</div>}
+        {error && <div className="warning">{error}</div>}
+        {!loading && !error && senders.length === 0 && <div className="empty">No verified senders available.</div>}
         <div className="field">
           <label>Sender shown to recipients</label>
-          <select className="select" value={selectedSenderId} onChange={(event) => onSenderChange(event.target.value)}>
+          <select className="select" value={selectedSenderId} onChange={(event) => onSenderChange(event.target.value)} disabled={loading || senders.length === 0}>
             {senders.map((sender) => <option key={sender.id} value={sender.id}>{senderLabel(sender)}</option>)}
           </select>
         </div>
