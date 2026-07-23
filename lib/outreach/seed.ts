@@ -1,4 +1,4 @@
-import type { EmailContact, EmailDraft, RecipientRow } from './types';
+import type { EmailContact, EmailDraft, EmailSender, RecipientRow } from './types';
 
 const now = new Date().toISOString();
 
@@ -20,4 +20,9 @@ export const initialDraft: EmailDraft = {
 
 export const initialRecipients: RecipientRow[] = [
   { id: 'row-1', contactId: 'contact-1', email: 'editor@techdaily.example', language: 'en', salutation: 'Hi Maya' },
+];
+
+export const allowedSenders: EmailSender[] = [
+  { id: 'pp-employee-1', displayName: 'Employee Name 1', email: 'employeename1@pp.com', domain: 'pp.com', domainVerified: true, senderVerified: true, status: 'active' },
+  { id: 'pp-employee-2', displayName: 'Employee Name 2', email: 'employeename2@pp.com', domain: 'pp.com', domainVerified: true, senderVerified: true, status: 'active' },
 ];

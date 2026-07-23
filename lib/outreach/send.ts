@@ -1,6 +1,6 @@
 import type { CampaignRecord, DeliveryRecord, EmailDraft, RenderedEmail } from './types';
 
-export function sendCampaignOneByOne(params: { name: string; draft: EmailDraft; renderedEmails: RenderedEmail[]; senderEmail: string; senderName: string; }): CampaignRecord {
+export function sendCampaignOneByOne(params: { name: string; draft: EmailDraft; renderedEmails: RenderedEmail[]; senderEmail: string; senderName: string; replyToEmail: string; }): CampaignRecord {
   const now = new Date().toISOString();
   const deliveries: DeliveryRecord[] = params.renderedEmails.map((email, index) => ({
     ...email,
@@ -19,6 +19,7 @@ export function sendCampaignOneByOne(params: { name: string; draft: EmailDraft; 
     bodyHtml: params.draft.bodyHtml,
     senderEmail: params.senderEmail,
     senderName: params.senderName,
+    replyToEmail: params.replyToEmail,
     totalCount: deliveries.length,
     successCount,
     failedCount,

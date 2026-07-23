@@ -8,6 +8,9 @@ interface Props {
   confirmArmed: boolean;
   validationErrors: SendValidationError[];
   testRecipientEmail: string;
+  senderName: string;
+  senderEmail: string;
+  replyToEmail: string;
   onTestRecipientEmailChange: (value: string) => void;
   onPreview: () => void;
   onTestSend: () => void;
@@ -15,7 +18,7 @@ interface Props {
   onRealSend: () => void;
 }
 
-export function PreviewPanel({ renderedEmails, previewed, testSent, confirmArmed, validationErrors, testRecipientEmail, onTestRecipientEmailChange, onPreview, onTestSend, onArmConfirm, onRealSend }: Props) {
+export function PreviewPanel({ renderedEmails, previewed, testSent, confirmArmed, validationErrors, testRecipientEmail, senderName, senderEmail, replyToEmail, onTestRecipientEmailChange, onPreview, onTestSend, onArmConfirm, onRealSend }: Props) {
   const warningCount = renderedEmails.reduce((sum, email) => sum + email.warnings.length, 0);
   const groupedErrors = validationErrors.reduce<Record<string, string[]>>((groups, error) => {
     groups[error.section] = [...(groups[error.section] || []), error.message];
@@ -30,6 +33,7 @@ export function PreviewPanel({ renderedEmails, previewed, testSent, confirmArmed
         </div>
       </div>
       <div className="panelBody stack">
+        <div className="senderPreview"><b>From</b><span>{senderName} &lt;{senderEmail}&gt;</span><b>Reply-to</b><span>{replyToEmail}</span></div>
         <div className="field"><label>Test recipient email</label><input className="input" value={testRecipientEmail} onChange={(event) => onTestRecipientEmailChange(event.target.value)} placeholder="internal-test@rococo.dev" /></div>
         <div className="rowWrap">
           <button className="button" onClick={onPreview}>Preview</button>

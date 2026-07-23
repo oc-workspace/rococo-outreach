@@ -2,6 +2,7 @@ export type ContactStatus = 'active' | 'inactive' | 'blocked';
 export type LanguageCode = 'zh' | 'en' | 'ja' | string;
 export type CampaignStatus = 'draft' | 'previewed' | 'sending' | 'sent' | 'partial_failed' | 'cancelled';
 export type DeliveryStatus = 'pending' | 'sending' | 'sent' | 'failed' | 'bounced' | 'replied';
+export type SenderStatus = 'active' | 'inactive' | 'disabled';
 
 export interface EmailContact {
   id: string;
@@ -38,6 +39,16 @@ export interface RecipientRow {
   salutation: string;
 }
 
+export interface EmailSender {
+  id: string;
+  displayName: string;
+  email: string;
+  domain: string;
+  domainVerified: boolean;
+  senderVerified: boolean;
+  status: SenderStatus;
+}
+
 export interface RenderedEmail {
   rowId: string;
   contactId?: string;
@@ -64,6 +75,7 @@ export interface CampaignRecord {
   bodyHtml: string;
   senderEmail: string;
   senderName: string;
+  replyToEmail: string;
   totalCount: number;
   successCount: number;
   failedCount: number;

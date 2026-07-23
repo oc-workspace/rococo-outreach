@@ -6,15 +6,14 @@ import { ContactPanel } from './ContactPanel';
 import { HistoryPanel } from './HistoryPanel';
 import { PreviewPanel } from './PreviewPanel';
 import { RecipientRows } from './RecipientRows';
-import { initialDraft, initialRecipients } from '@/lib/outreach/seed';
+import { SenderSettings } from './SenderSettings';
+import { allowedSenders, initialDraft, initialRecipients } from '@/lib/outreach/seed';
 import { hasDuplicateRecipients, renderRecipientEmail } from '@/lib/outreach/render';
 import { sendCampaignOneByOne } from '@/lib/outreach/send';
 import { validateCampaignSend } from '@/lib/outreach/validation';
 import type { CampaignRecord, EmailContact, EmailDraft, RecipientRow } from '@/lib/outreach/types';
 import type { SendValidationError, SendValidationMode } from '@/lib/outreach/validation';
 
-const senderEmail = 'noreply@rococo.dev';
-const senderName = 'Rococo';
 type WorkspaceTab = 'contacts' | 'campaign' | 'compose';
 
 function newId(prefix: string) {
@@ -37,6 +36,8 @@ export function OutreachApp() {
   const [contactQuery, setContactQuery] = useState('');
   const [newlySavedContactId, setNewlySavedContactId] = useState<string | null>(null);
   const [campaignName, setCampaignName] = useState('July media outreach');
+  const [selectedSenderId, setSelectedSenderId] = useState(allowedSenders[0]?.id || '');
+  const [replyToEmail, setReplyToEmail] = useState(allowedSenders[0]?.email || '');
   const [draft, setDraft] = useState<EmailDraft>(initialDraft);
   const [rows, setRows] = useState<RecipientRow[]>(initialRecipients);
   const [previewed, setPreviewed] = useState(false);
@@ -78,6 +79,9 @@ export function OutreachApp() {
   }, [contacts, contactQuery]);
 
   const renderedEmails = useMemo(() => rows.map((row) => renderRecipientEmail(draft, row, contacts)), [contacts, draft, rows]);
+  const selectedSender = allowedSenders.find((sender) => sender.id === selectedSenderId);
+  const senderEmail = selectedSender?.email || '';
+  const senderName = selectedSender?.displayName || '';
   const duplicateRecipients = hasDuplicateRecipients(rows);
 
   function resetSendGuards() {
@@ -95,6 +99,10 @@ export function OutreachApp() {
       contacts,
       senderEmail,
       senderName,
+      replyToEmail,
+      senderDomainVerified: Boolean(selectedSender?.domainVerified),
+      senderVerified: Boolean(selectedSender?.senderVerified),
+      senderActive: selectedSender?.status === 'active',
       previewed,
       testRecipientEmail,
       mode,
@@ -197,10 +205,17 @@ export function OutreachApp() {
     const errors = getSendValidationErrors('real');
     setValidationErrors(errors);
     if (errors.length > 0) return;
-    const campaign = sendCampaignOneByOne({ name: campaignName, draft, renderedEmails, senderEmail, senderName });
+    const campaign = sendCampaignOneByOne({ name: campaignName, draft, renderedEmails, senderEmail, senderName, replyToEmail });
     setCampaigns((current) => [campaign, ...current]);
     setConfirmArmed(false);
     setActiveTab('campaign');
+  }
+
+  function updateSender(senderId: string) {
+    const nextSender = allowedSenders.find((sender) => sender.id === senderId);
+    setSelectedSenderId(senderId);
+    setReplyToEmail(nextSender?.email || '');
+    resetSendGuards();
   }
 
   const tabs: Array<{ id: WorkspaceTab; label: string; meta: string }> = [
@@ -256,11 +271,12 @@ export function OutreachApp() {
         {activeTab === 'compose' && (
           <section className="tabPane composeGrid">
             <div className="composeLeft">
+              <SenderSettings senders={allowedSenders} selectedSenderId={selectedSenderId} replyToEmail={replyToEmail} onSenderChange={updateSender} onReplyToEmailChange={(value) => { setReplyToEmail(value); resetSendGuards(); }} />
               <CampaignBuilder campaignName={campaignName} draft={draft} onCampaignNameChange={(value) => { setCampaignName(value); resetSendGuards(); }} onDraftChange={updateDraft} />
               <RecipientRows rows={rows} contacts={contacts} hasDuplicate={duplicateRecipients} onAddRow={addRow} onRemoveRow={removeRow} onUpdateRow={updateRow} />
             </div>
             <div className="composeRight">
-              <PreviewPanel renderedEmails={renderedEmails} previewed={previewed} testSent={testSent} confirmArmed={confirmArmed} validationErrors={validationErrors} testRecipientEmail={testRecipientEmail} onTestRecipientEmailChange={(value) => { setTestRecipientEmail(value); setValidationErrors([]); setTestSent(false); }} onPreview={previewCampaign} onTestSend={testSend} onArmConfirm={armConfirm} onRealSend={realSend} />
+              <PreviewPanel renderedEmails={renderedEmails} previewed={previewed} testSent={testSent} confirmArmed={confirmArmed} validationErrors={validationErrors} testRecipientEmail={testRecipientEmail} senderName={senderName} senderEmail={senderEmail} replyToEmail={replyToEmail} onTestRecipientEmailChange={(value) => { setTestRecipientEmail(value); setValidationErrors([]); setTestSent(false); }} onPreview={previewCampaign} onTestSend={testSend} onArmConfirm={armConfirm} onRealSend={realSend} />
             </div>
           </section>
         )}

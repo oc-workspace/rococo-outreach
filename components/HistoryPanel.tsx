@@ -14,7 +14,7 @@ export function HistoryPanel({ campaigns }: { campaigns: CampaignRecord[] }) {
           {campaigns.map((campaign) => (
             <article className="historyItem" key={campaign.id}>
               <div className="historyTitle"><span>{campaign.name}</span><span>{campaign.status}</span></div>
-              <div className="rowWrap"><span className="pill">total {campaign.totalCount}</span><span className="pill">sent {campaign.successCount}</span><span className="pill">failed {campaign.failedCount}</span></div>
+              <div className="rowWrap"><span className="pill">From {campaign.senderName} &lt;{campaign.senderEmail}&gt;</span><span className="pill">Reply-to {campaign.replyToEmail}</span><span className="pill">total {campaign.totalCount}</span><span className="pill">sent {campaign.successCount}</span><span className="pill">failed {campaign.failedCount}</span></div>
               <div className="deliveryGrid">
                 {campaign.deliveries.map((delivery) => <><span key={`${delivery.id}-email`}>{delivery.to}</span><span key={`${delivery.id}-status`}>{delivery.sendStatus}</span></>)}
               </div>

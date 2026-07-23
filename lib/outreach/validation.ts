@@ -6,7 +6,7 @@ const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export type SendValidationMode = 'test' | 'real';
 
 export interface SendValidationError {
-  section: 'Campaign draft' | 'Recipients' | 'Test send';
+  section: 'Campaign draft' | 'Sender settings' | 'Recipients' | 'Test send';
   message: string;
 }
 
@@ -17,6 +17,10 @@ export interface SendValidationInput {
   contacts: EmailContact[];
   senderEmail: string;
   senderName: string;
+  replyToEmail: string;
+  senderDomainVerified: boolean;
+  senderVerified: boolean;
+  senderActive: boolean;
   previewed: boolean;
   testRecipientEmail: string;
   mode: SendValidationMode;
@@ -37,8 +41,12 @@ export function validateCampaignSend(input: SendValidationInput) {
   pushMissing(errors, 'Campaign draft', input.campaignName.trim().length > 0, 'Campaign name is required.');
   pushMissing(errors, 'Campaign draft', input.draft.subject.trim().length > 0, 'Subject is required.');
   pushMissing(errors, 'Campaign draft', bodyText.length > 0, 'Rich body HTML is required.');
-  pushMissing(errors, 'Campaign draft', isEmail(input.senderEmail), 'Sender email is required.');
-  pushMissing(errors, 'Campaign draft', input.senderName.trim().length > 0, 'Sender name is required.');
+  pushMissing(errors, 'Sender settings', isEmail(input.senderEmail), 'Sender email is required.');
+  pushMissing(errors, 'Sender settings', input.senderName.trim().length > 0, 'Sender name is required.');
+  pushMissing(errors, 'Sender settings', isEmail(input.replyToEmail), 'Reply-to email is required.');
+  pushMissing(errors, 'Sender settings', input.senderDomainVerified, 'Sender domain must be verified.');
+  pushMissing(errors, 'Sender settings', input.senderVerified, 'Sender email must be verified.');
+  pushMissing(errors, 'Sender settings', input.senderActive, 'Sender must be active.');
   pushMissing(errors, input.mode === 'test' ? 'Test send' : 'Recipients', input.previewed, 'Run preview before sending.');
 
   if (input.mode === 'test') {
