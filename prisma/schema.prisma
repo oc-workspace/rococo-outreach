@@ -27,3 +27,19 @@ model EmailContact {
   @@index([status])
   @@map("email_contacts")
 }
+
+model EmailSender {
+  id              String   @id @default(cuid())
+  displayName     String   @default("")
+  email           String   @unique
+  domain          String   @default("")
+  domainVerified  Boolean  @default(false)
+  senderVerified  Boolean  @default(false)
+  status          String   @default("inactive")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([domain])
+  @@index([status])
+  @@map("email_senders")
+}
