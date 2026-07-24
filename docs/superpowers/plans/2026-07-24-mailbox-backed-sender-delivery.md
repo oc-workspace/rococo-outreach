@@ -1,10 +1,10 @@
-# Mailbox-Backed Sender Delivery Implementation Plan
+# Enterprise Mailbox-Backed Sender Delivery Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Let an employee send outreach from an allowed mailbox such as `employee1@qq.com`, have recipients see and reply to that mailbox, and, where provider capabilities allow it, have the sent message appear in that employee mailbox's Sent folder.
+**Goal:** Let an employee send outreach from an allowed enterprise mailbox such as `employee@pp.com`, have recipients see and reply to that mailbox, and, where provider capabilities allow it, have the sent message appear in that employee mailbox's Sent folder.
 
-**Architecture:** Keep frontend sender selection simple and server-authoritative. Add a real send API, persistent campaign/delivery records, and a mailbox account layer that separates sender identity (`From` and `Reply-To`) from the transport used to deliver the message. For Sent-folder visibility, prefer mailbox-owned SMTP/API sending or explicit append-to-sent support; do not pretend a third-party provider send will automatically appear in `employee1@qq.com` Sent Mail.
+**Architecture:** Keep frontend sender selection simple and server-authoritative. Add a real send API, persistent campaign/delivery records, and a mailbox account layer that separates sender identity (`From` and `Reply-To`) from the transport used to deliver the message. For Sent-folder visibility, prefer enterprise mailbox-owned SMTP/API sending or explicit append-to-sent support; do not pretend a third-party provider send will automatically appear in `employee@pp.com` Sent Mail.
 
 **Tech Stack:** Next.js 14 App Router, React 18, TypeScript 5.4, Prisma 6.19, PostgreSQL, current `fetch`-based React state, existing CSS in `app/globals.css`, deployment through `/home/openclaw/bin/oc-deploy rococo-outreach deploy`.
 
@@ -15,10 +15,10 @@
 - Current send behavior is simulated in `lib/outreach/send.ts`; it does not send real email.
 - Current campaign history is frontend state only; it is lost on reload.
 - Current `/api/senders` is database-backed and returns `EmailSender[]`.
-- Current seeded sender emails are `employeename1@pp.com` and `employeename2@pp.com`; the new requirement explicitly allows a team domain like `pp.com` to use sender mailbox addresses like `employee1@qq.com`.
+- Current seeded sender emails are `employeename1@pp.com` and `employeename2@pp.com`; the clarified requirement is to support company employee mailboxes like `employee@pp.com` that are accessed through Enterprise WeChat / Tencent enterprise mail.
 - One campaign must still create one independent email per recipient. Never place multiple outreach recipients in one `To`, `CC`, or shared `BCC` send.
 - The backend must be authoritative for sender eligibility, mailbox authorization, provider errors, rate limits, and delivery persistence.
-- Do not store raw mailbox passwords. If QQ Mail SMTP is used, store only an encrypted app password or provider token, never a login password.
+- Do not store raw mailbox passwords. If enterprise mailbox SMTP is used, store only an encrypted app password, authorization code, or provider token, never a login password.
 - Do not log secrets, OAuth tokens, app passwords, SMTP credentials, full message bodies, or recipient lists in deployment logs.
 - Use small commits after each independently testable task.
 
@@ -28,16 +28,16 @@
 
 The user-facing requirement has three different levels:
 
-1. Recipient sees `From: employee1@qq.com`.
-2. Recipient replies to `employee1@qq.com`.
-3. `employee1@qq.com` mailbox Sent folder shows the sent email.
+1. Recipient sees `From: employee@pp.com`.
+2. Recipient replies to `employee@pp.com`.
+3. `employee@pp.com` mailbox Sent folder shows the sent email.
 
 Levels 1 and 2 can be implemented with a mail provider only if that provider allows the sender address and reply-to address. Level 3 usually cannot be guaranteed by generic provider sending. To make Sent Mail appear inside the employee's mailbox, the system must either:
 
 - send through that exact mailbox account via SMTP or mailbox provider API; or
 - send elsewhere and separately append a copy to the mailbox Sent folder through IMAP/API, if the mailbox provider allows it.
 
-For QQ Mail specifically, the practical MVP path is likely SMTP with a QQ Mail app-specific authorization code. OAuth/API support and IMAP append behavior must be verified before promising automatic Sent-folder sync.
+For the first team, the mailbox is confirmed to be an enterprise mailbox accessed through Enterprise WeChat. The practical MVP path is likely enterprise SMTP with an account-specific authorization code or admin-enabled SMTP access. Enterprise WeChat / Tencent enterprise mail API support, SMTP/IMAP availability, and Sent-folder behavior must be verified before promising automatic Sent-folder sync.
 
 ## Current State Summary
 
@@ -56,13 +56,13 @@ Not implemented yet:
 - Real send API endpoint.
 - Persistent campaign and delivery database records.
 - Sender mailbox credentials/tokens.
-- Mailbox authorization flow for `employee1@qq.com`.
+- Mailbox authorization flow for `employee@pp.com` enterprise mailboxes.
 - Sent folder confirmation or sync.
 - Provider-specific error states in UI.
 
 ## Recommended Product Decision
 
-Support `employee1@qq.com` as a mailbox-backed sender only after the employee authorizes that mailbox. The `pp.com` team domain is the workspace/company domain, not necessarily the sender email domain. The sender domain for email authentication is `qq.com`, so this should be modeled as an external mailbox sender.
+Support `employee@pp.com` as an enterprise mailbox-backed sender only after that employee mailbox is authorized or confirmed by the enterprise mail admin. The `pp.com` domain is both the workspace/company domain and the sender email domain, so this should be modeled as a company mailbox sender rather than a personal external mailbox sender.
 
 Recommended sender modes:
 
@@ -70,9 +70,9 @@ Recommended sender modes:
 type SenderTransportMode = 'provider_domain' | 'mailbox_smtp' | 'mailbox_api';
 ```
 
-- `provider_domain`: uses a verified sending domain owned by the app/team, for example `employee1@pp.com` through Resend or SMTP. Sent folder in the employee's mailbox is not guaranteed.
-- `mailbox_smtp`: uses the employee mailbox SMTP account, for example QQ Mail SMTP with an app authorization code. This is the best MVP candidate for Sent folder visibility, but behavior must be verified with QQ Mail.
-- `mailbox_api`: uses Gmail/Microsoft/QQ enterprise APIs when available. Best long-term model for OAuth and Sent folder accuracy.
+- `provider_domain`: uses a verified sending domain owned by the app/team, for example `employee@pp.com` through a provider. Sent folder in the employee's mailbox is not guaranteed.
+- `mailbox_smtp`: uses the employee's enterprise mailbox SMTP account, for example Tencent enterprise mail SMTP if the admin enables it. This is the best MVP candidate for Sent folder visibility, but behavior must be verified with the actual enterprise mailbox.
+- `mailbox_api`: uses an enterprise mail API when available. Best long-term model for admin-managed authorization and Sent folder accuracy.
 
 ## Target Data Flow
 
@@ -91,11 +91,11 @@ SenderSettings
 For mailbox-backed sending:
 
 ```text
-EmailSender employee1@qq.com
+EmailSender employee@pp.com
   -> EmailMailboxAccount encrypted credentials/token
-  -> SMTP/API transport owned by employee1@qq.com
-  -> recipient sees From employee1@qq.com
-  -> Reply-To employee1@qq.com
+  -> SMTP/API transport owned by employee@pp.com
+  -> recipient sees From employee@pp.com
+  -> Reply-To employee@pp.com
   -> Sent folder visibility depends on provider behavior/API support
 ```
 
@@ -122,6 +122,130 @@ Planned files and responsibilities:
 - Modify: `components/HistoryPanel.tsx` - render persisted campaign/delivery status from server.
 - Modify: `components/PreviewPanel.tsx` - show clear From, Reply-To, and Sent-folder capability before sending.
 - Create: `docs/product/mailbox-backed-sender-delivery.md` - user-facing product notes and provider caveats.
+
+---
+
+### Task 0: Confirm Enterprise Mail Provider and Test Mailbox Capabilities
+
+**Files:**
+- Create: `docs/operations/enterprise-mailbox-checklist.md`
+- Modify: `docs/product/mailbox-backed-sender-delivery.md` if it already exists by the time this task runs.
+
+**Interfaces:**
+- Consumes: one real employee mailbox such as `employee@pp.com` and the company's mail admin/login context.
+- Produces: provider facts that Tasks 6 and 7 must use for SMTP/API configuration.
+
+- [ ] **Step 1: Document what counts as confirmed**
+
+Create `docs/operations/enterprise-mailbox-checklist.md`:
+
+```md
+# Enterprise Mailbox Capability Checklist
+
+## Known Context
+
+- Company/team domain: `pp.com`
+- Employee mailbox format: `employee@pp.com`
+- Login surface observed by user: Enterprise WeChat / WeCom company login
+
+This strongly suggests the mailbox is managed through Enterprise WeChat / Tencent enterprise mail, but engineering should still confirm the actual mail routing and SMTP/API settings before implementation.
+
+## Provider Confirmation
+
+Confirm at least one of these:
+
+- The mailbox web UI or settings page identifies the provider as Enterprise WeChat mail, Tencent enterprise mail, or Tencent Exmail.
+- The domain MX records point to Tencent enterprise mail servers.
+- The company mail admin console shows the mail service provider and SMTP/IMAP settings.
+
+Record the result:
+
+```text
+Provider:
+MX records:
+Admin/settings page evidence:
+Confirmed by:
+Date:
+```
+
+## SMTP / IMAP Capability
+
+Confirm in the employee mailbox or admin console:
+
+- SMTP is enabled for the employee mailbox.
+- IMAP is enabled only if Sent-folder append/sync is needed beyond SMTP send behavior.
+- The account uses an authorization code, app password, or enterprise token instead of the login password.
+- SMTP host, port, and TLS mode are known.
+- Any outbound limits or anti-abuse restrictions are known.
+
+Record the result:
+
+```text
+SMTP enabled: yes/no
+SMTP host:
+SMTP port:
+SMTP secure/TLS mode:
+Auth method:
+IMAP enabled: yes/no
+IMAP host:
+IMAP port:
+Daily/hourly send limit:
+```
+
+## Test Mailbox
+
+Using the user's own employee mailbox can count as the first test mailbox if the user is allowed to test sending from it.
+
+Record the result:
+
+```text
+Test sender address:
+Can send test email: yes/no
+Can inspect inbox and sent folder: yes/no
+Has permission to use this mailbox for integration testing: yes/no
+```
+
+## Sent Folder Verification
+
+After SMTP/API sending is implemented in a controlled environment, send one test email from `employee@pp.com` to a controlled recipient.
+
+Record the result:
+
+```text
+Recipient saw From as employee@pp.com: yes/no
+Recipient reply target was employee@pp.com: yes/no
+Message appeared in employee@pp.com Sent folder: yes/no
+Provider message id:
+Observed at:
+```
+```
+
+- [ ] **Step 2: Verify provider identity from available settings**
+
+Use the employee mailbox UI, company admin panel, or DNS/MX lookup. Do not use mailbox credentials in shell history. Record only non-secret provider facts in `docs/operations/enterprise-mailbox-checklist.md`.
+
+- [ ] **Step 3: Verify SMTP/IMAP settings without storing secrets**
+
+Confirm whether SMTP/IMAP is enabled and whether an authorization code is required. Record host/port/TLS/auth method, but do not record the authorization code or password.
+
+- [ ] **Step 4: Decide first transport mode**
+
+Use this decision rule:
+
+```text
+If SMTP is enabled and a test mailbox authorization code is available -> use mailbox_smtp first.
+If SMTP is disabled but enterprise mail API exists -> use mailbox_api first.
+If neither is available -> block real sending and keep mock transport until admin access is resolved.
+```
+
+- [ ] **Step 5: Commit checklist**
+
+Run:
+
+```bash
+git add docs/operations/enterprise-mailbox-checklist.md docs/product/mailbox-backed-sender-delivery.md
+git commit -m "Document enterprise mailbox capability checks"
+```
 
 ---
 
@@ -991,7 +1115,7 @@ model EmailMailboxAccount {
   id                      String      @id @default(cuid())
   senderId                String      @unique
   sender                  EmailSender @relation(fields: [senderId], references: [id], onDelete: Cascade)
-  provider                String      @default("qq_mail")
+  provider                String      @default("tencent_enterprise_mail")
   smtpHost                String      @default("")
   smtpPort                Int         @default(465)
   smtpSecure              Boolean     @default(true)
@@ -1090,8 +1214,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const account = await prisma.emailMailboxAccount.upsert({
     where: { senderId: params.id },
     update: {
-      provider: payload.provider ?? 'qq_mail',
-      smtpHost: payload.smtpHost ?? 'smtp.qq.com',
+      provider: payload.provider ?? 'tencent_enterprise_mail',
+      smtpHost: payload.smtpHost ?? 'smtp.exmail.qq.com',
       smtpPort: Number(payload.smtpPort ?? 465),
       smtpSecure: Boolean(payload.smtpSecure ?? true),
       username: payload.username,
@@ -1100,8 +1224,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
     },
     create: {
       senderId: params.id,
-      provider: payload.provider ?? 'qq_mail',
-      smtpHost: payload.smtpHost ?? 'smtp.qq.com',
+      provider: payload.provider ?? 'tencent_enterprise_mail',
+      smtpHost: payload.smtpHost ?? 'smtp.exmail.qq.com',
       smtpPort: Number(payload.smtpPort ?? 465),
       smtpSecure: Boolean(payload.smtpSecure ?? true),
       username: payload.username,
@@ -1212,7 +1336,7 @@ if (payload.senderEmail !== sender.email) {
 }
 ```
 
-- [ ] **Step 4: Verify QQ SMTP behavior manually in dev**
+- [ ] **Step 4: Verify enterprise mailbox SMTP behavior manually in dev**
 
 Configure one test sender as:
 
@@ -1220,18 +1344,19 @@ Configure one test sender as:
 transportMode=mailbox_smtp
 mailboxStatus=connected
 sentFolderMode=smtp_account
-mailboxAccount.smtpHost=smtp.qq.com
+mailboxAccount.provider=tencent_enterprise_mail
+mailboxAccount.smtpHost=smtp.exmail.qq.com
 mailboxAccount.smtpPort=465
 mailboxAccount.smtpSecure=true
-mailboxAccount.username=employee1@qq.com
+mailboxAccount.username=employee@pp.com
 ```
 
 Run a test send to a controlled address and verify:
 
 ```text
-Recipient sees From: employee1@qq.com
-Recipient reply target is employee1@qq.com
-QQ mailbox Sent folder behavior is observed and documented
+Recipient sees From: employee@pp.com
+Recipient reply target is employee@pp.com
+Enterprise mailbox Sent folder behavior is observed and documented
 ```
 
 - [ ] **Step 5: Run build and commit**
@@ -1341,11 +1466,11 @@ Create `docs/product/mailbox-backed-sender-delivery.md`:
 
 ## User Requirement
 
-When a team member sends from `employee1@qq.com`, recipients should see `employee1@qq.com` as the sender, replies should go to `employee1@qq.com`, and the sent message should appear in the `employee1@qq.com` mailbox Sent folder when provider capabilities allow it.
+When a team member sends from `employee@pp.com`, recipients should see `employee@pp.com` as the sender, replies should go to `employee@pp.com`, and the sent message should appear in the `employee@pp.com` mailbox Sent folder when provider capabilities allow it.
 
 ## Important Constraint
 
-Showing `From: employee1@qq.com` is not the same as writing to the QQ Mail Sent folder. Sent folder visibility usually requires sending through the actual mailbox account or appending to Sent through the mailbox provider.
+Showing `From: employee@pp.com` is not the same as writing to that employee mailbox's Sent folder. Sent folder visibility usually requires sending through the actual enterprise mailbox account or appending to Sent through the mailbox provider.
 
 ## Supported Modes
 
@@ -1353,9 +1478,9 @@ Showing `From: employee1@qq.com` is not the same as writing to the QQ Mail Sent 
 - `mailbox_smtp`: sends through the employee mailbox SMTP account; Sent folder behavior must be verified per provider.
 - `mailbox_api`: future OAuth/API mode for providers that expose send and Sent folder behavior.
 
-## QQ Mail Notes
+## Enterprise WeChat / Tencent Enterprise Mail Notes
 
-QQ Mail SMTP requires an authorization code/app password. Do not store QQ account login passwords. Sent folder behavior must be manually verified with the exact QQ Mail account type being used.
+The first target team uses company employee mailboxes accessed through Enterprise WeChat. Treat this as enterprise mailbox delivery, not personal QQ Mail delivery. Confirm SMTP/API availability in the enterprise mailbox settings or admin console. Do not store account login passwords; use an authorization code, app password, or provider token. Sent folder behavior must be manually verified with the exact employee mailbox type being used.
 ```
 
 - [ ] **Step 2: Update status doc**
@@ -1363,8 +1488,8 @@ QQ Mail SMTP requires an authorization code/app password. Do not store QQ accoun
 Add this to `docs/product/email-sender-requirements-status.md` under `Not Done Yet`:
 
 ```md
-- [ ] Implement mailbox-backed sending for external sender addresses such as `employee1@qq.com`.
-- [ ] Verify whether QQ Mail SMTP sends appear in QQ Mail Sent folder for the target account type.
+- [ ] Implement enterprise mailbox-backed sending for employee addresses such as `employee@pp.com`.
+- [ ] Verify whether Enterprise WeChat / Tencent enterprise mail SMTP sends appear in the employee mailbox Sent folder.
 ```
 
 - [ ] **Step 3: Update deploy doc with environment variables**
@@ -1467,10 +1592,10 @@ Only after a real test mailbox is connected, send one email to a controlled reci
 Expected:
 
 ```text
-Recipient sees From: employee1@qq.com
-Reply goes to employee1@qq.com
+Recipient sees From: employee@pp.com
+Reply goes to employee@pp.com
 ProviderMessageId is stored
-QQ Mail Sent folder result is recorded in docs/product/mailbox-backed-sender-delivery.md
+Enterprise mailbox Sent folder result is recorded in docs/product/mailbox-backed-sender-delivery.md
 ```
 
 - [ ] **Step 7: Final git check**
@@ -1499,9 +1624,9 @@ Do not promise Sent folder visibility until it is tested with the exact mailbox 
 
 Spec coverage:
 
-- Recipient sees `employee1@qq.com`: covered by Task 3, Task 4, Task 7, and Task 8.
-- Replies go to `employee1@qq.com`: covered by `replyToEmail` in Task 3 and validation/UI in Task 8.
-- `employee1@qq.com` Sent folder visibility: covered by mailbox SMTP/API architecture, Task 7 manual verification, and Task 9 documentation.
+- Recipient sees `employee@pp.com`: covered by Task 3, Task 4, Task 7, and Task 8.
+- Replies go to `employee@pp.com`: covered by `replyToEmail` in Task 3 and validation/UI in Task 8.
+- `employee@pp.com` Sent folder visibility: covered by mailbox SMTP/API architecture, Task 7 manual verification, and Task 9 documentation.
 - Current functionality gap: documented in Current State Summary and addressed by Tasks 2-8.
 
 Placeholder scan:
