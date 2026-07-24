@@ -37,7 +37,7 @@ export function SenderSettings({ senders, selectedSenderId, replyToEmail, loadin
             {senders.map((sender) => <option key={sender.id} value={sender.id}>{senderLabel(sender)}</option>)}
           </select>
         </div>
-        <div className="field"><label>Reply-to email</label><input className="input" value={replyToEmail} onChange={(event) => onReplyToEmailChange(event.target.value)} /></div>
+        <div className="field"><label>Reply-to email</label><input className="input" disabled={loading || senders.length === 0} value={replyToEmail} onChange={(event) => onReplyToEmailChange(event.target.value)} /></div>
         {selectedSender && <div className="senderHint">Domain {selectedSender.domain}: {selectedSender.domainVerified ? 'verified' : 'not verified'} · Sender: {selectedSender.senderVerified ? 'verified' : 'not verified'}</div>}
       </div>
     </section>

@@ -88,7 +88,10 @@ export function OutreachApp() {
         const nextSenders = payload?.data ?? [];
         if (!cancelled) {
           setSenders(nextSenders);
-          setSelectedSenderId((current) => current || nextSenders[0]?.id || '');
+          setSelectedSenderId((current) => {
+            if (nextSenders.some((sender: EmailSender) => sender.id === current)) return current;
+            return nextSenders[0]?.id || '';
+          });
           setReplyToEmail((current) => current || nextSenders[0]?.email || '');
         }
       } catch (error) {
