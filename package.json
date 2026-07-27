@@ -19,11 +19,13 @@
     "@types/react": "18.2.67",
     "@types/react-dom": "18.2.22",
     "next": "14.2.23",
+    "nodemailer": "^9.0.3",
     "react": "18.2.0",
     "react-dom": "18.2.0",
     "typescript": "5.4.2"
   },
   "devDependencies": {
+    "@types/nodemailer": "^8.0.1",
     "eslint": "8.57.0",
     "eslint-config-next": "14.2.23",
     "prisma": "6.19.0"
