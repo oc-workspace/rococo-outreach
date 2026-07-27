@@ -8,6 +8,9 @@ export interface SmtpTransportConfig {
   secure: boolean;
   user: string;
   password: string;
+  connectionTimeoutMs?: number;
+  greetingTimeoutMs?: number;
+  socketTimeoutMs?: number;
 }
 
 export class SmtpMailTransport implements MailTransport {
@@ -22,6 +25,9 @@ export class SmtpMailTransport implements MailTransport {
         user: config.user,
         pass: config.password,
       },
+      connectionTimeout: config.connectionTimeoutMs ?? 10000,
+      greetingTimeout: config.greetingTimeoutMs ?? 10000,
+      socketTimeout: config.socketTimeoutMs ?? 15000,
     });
   }
 
