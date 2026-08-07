@@ -28,6 +28,11 @@ git@github.com-oc-workspace-write:oc-workspace/rococo-outreach.git
 The app container exposes port `3000`; Compose maps host port `3107` to
 container port `3000`.
 
+The repository `.dockerignore` excludes `.env`, dependency directories, build
+output, git metadata, logs, and coverage data from the Docker build context.
+Do not remove the `.env` exclusions: the deployment environment contains SMTP
+and database credentials that must never be copied into image build layers.
+
 ## Maintenance commands
 
 ```bash
