@@ -15,5 +15,6 @@ export interface MailSendResult {
 }
 
 export interface MailTransport {
+  verify(): Promise<void>;
   send(message: MailMessage): Promise<MailSendResult>;
 }

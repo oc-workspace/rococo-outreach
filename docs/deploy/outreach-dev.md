@@ -68,6 +68,33 @@ During migration, HTTP/API health checks, PostgreSQL table counts, GitHub push
 dry-run, restricted deployment, domain binding, and SMTP TLS connections on
 ports 465 and 587 were verified successfully from the target environment.
 
+## SMTP test endpoint
+
+The development-only SMTP diagnostic endpoint is disabled unless
+`SMTP_TEST_API_TOKEN` is configured. Keep this token server-side and never put
+it in browser code, source control, documentation, or command history.
+
+Authenticated operations are:
+
+```text
+GET  /api/campaigns/send-test  configuration readiness only
+PUT  /api/campaigns/send-test  verify SMTP connection and authentication; does not send
+POST /api/campaigns/send-test  send one email to the configured controlled recipient
+```
+
+Send the token as `Authorization: Bearer <token>`. Responses mask mailbox
+addresses and do not return provider response text. Verification and test sends
+are rate limited in each application process. The default minimum intervals are
+10 seconds for verification and 60 seconds for test sends; override them with
+`SMTP_TEST_VERIFY_INTERVAL_SECONDS` and `SMTP_TEST_SEND_INTERVAL_SECONDS` only
+when operationally necessary.
+
+For Tencent enterprise mail, the current verified application configuration is
+port 465 with implicit TLS (`TENCENT_MAIL_SMTP_SECURE=true`). Port 587 requires
+`TENCENT_MAIL_SMTP_SECURE=false`; the transport then requires STARTTLS before
+authentication. Do not implement automatic port failover during a send because
+an ambiguous failure can otherwise produce a duplicate email.
+
 ## `netcup1` rollback retention
 
 Migration does **not** automatically delete the old `netcup1` deployment. The

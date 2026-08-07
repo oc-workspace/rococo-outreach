@@ -97,6 +97,12 @@ Implemented frontend boundaries:
 - [x] Tightened frontend state so a stale selected sender id is corrected after sender reloads.
 - [x] Disabled reply-to input while senders are loading or unavailable.
 - [x] Built, pushed, deployed, and smoke-verified the current sender persistence flow.
+- [x] Confirmed Tencent enterprise mail / Enterprise WeChat mail as the current mailbox provider target.
+- [x] Implemented a provider-neutral SMTP transport with bounded connection, greeting, and socket timeouts.
+- [x] Verified port 465 implicit TLS and mailbox authentication from the deployed application container.
+- [x] Verified that port 587 is network/STARTTLS reachable, while recording that Nodemailer authentication is not yet stable on that port.
+- [x] Added a non-sending SMTP `verify()` operation and enforced safe 465/587 TLS configuration pairs.
+- [x] Protected the development SMTP test endpoint with a server-side bearer token, masked addresses, sanitized errors, private/no-store responses, and per-process rate limits.
 
 ## Not Done Yet
 
@@ -107,8 +113,11 @@ Implemented frontend boundaries:
 - [ ] Add write APIs for sender management, if the product wants sender management inside this app.
 - [ ] Add workspace/team ownership and permissions for sender records.
 - [ ] Add a real domain and sender verification workflow, including provider/DNS status if needed.
-- [ ] Replace mock sending with a real mail provider integration.
+- [ ] Replace the frontend mock campaign send with the real backend SMTP transport. The current real SMTP path is limited to the protected development test endpoint.
 - [ ] Enforce allowed sender eligibility again at the real send API layer when provider sending is connected.
+- [ ] Bind each allowed `EmailSender` to the exact authenticated mailbox account and reject sender/mailbox mismatches.
+- [ ] Run one controlled port 465 test send and verify `From`, `Reply-To`, and Tencent Sent-folder visibility.
+- [ ] Add IMAP append or a mailbox API only if Tencent SMTP does not populate the Sent folder.
 - [ ] Persist campaign records and delivery records in the database. Current send/campaign history is still simulated in frontend state.
 - [ ] Add browser-level interaction tests for sender selection and invalid sender recovery.
 
@@ -120,19 +129,17 @@ Free text sender input is flexible, but it makes invalid or spoofed sender addre
 
 ## Current Verification Snapshot
 
-Latest verified commit:
-
-```text
-b2c58a7 Tighten sender selection states
-```
-
-Smoke verification passed:
+Verified on `netcup2` on 2026-08-07:
 
 - `https://outreach-dev.rococo.dev` returns `200 OK`.
 - `GET /api/senders` returns two database-backed sender records.
 - `GET /api/contacts` returns contact data.
-- Deployment logs show `No pending migrations to apply` and Next.js ready.
-- Git ahead/behind is `0 0` against `origin/main`.
+- Both 465 implicit TLS and 587 STARTTLS pass TCP/TLS certificate checks from the application container.
+- Nodemailer authentication succeeds on 465 with `secure=true`.
+- Nodemailer verification on 587 times out and is not approved for application use yet.
+- The protected endpoint passes unauthenticated, authenticated/masked, non-sending verification, and disabled-by-default integration checks.
+- `yarn build` passes.
+- A real test email and Sent-folder verification have not been performed in this slice.
 
 ## Open Questions
 

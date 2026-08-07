@@ -2,9 +2,6 @@ import { SmtpMailTransport, type SmtpTransportConfig } from './smtpTransport';
 import type { MailTransport } from './transport';
 
 export interface TencentEnterpriseMailConfig extends SmtpTransportConfig {
-  imapHost: string;
-  imapPort: number;
-  imapSecure: boolean;
   testRecipientEmail: string;
 }
 
@@ -19,9 +16,6 @@ export function readTencentEnterpriseMailConfig(): TencentEnterpriseMailConfig {
     host: requiredEnv('TENCENT_MAIL_SMTP_HOST'),
     port: requiredNumberEnv('TENCENT_MAIL_SMTP_PORT'),
     secure: requiredBooleanEnv('TENCENT_MAIL_SMTP_SECURE'),
-    imapHost: requiredEnv('TENCENT_MAIL_IMAP_HOST'),
-    imapPort: requiredNumberEnv('TENCENT_MAIL_IMAP_PORT'),
-    imapSecure: requiredBooleanEnv('TENCENT_MAIL_IMAP_SECURE'),
     testRecipientEmail: requiredEnv('TEST_RECIPIENT_EMAIL'),
   };
 
