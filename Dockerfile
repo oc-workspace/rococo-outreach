@@ -12,7 +12,10 @@ RUN apk add --no-cache bash
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED 1
-RUN yarn build
+# Prisma Client generation requires a syntactically valid URL but does not
+# connect during this build. Never pass the real runtime database secret into
+# the Docker build context or build arguments.
+RUN DATABASE_URL="postgresql://build_user:build_password@127.0.0.1:5432/build_db?schema=public" yarn build
 
 FROM node:20-alpine
 WORKDIR /app

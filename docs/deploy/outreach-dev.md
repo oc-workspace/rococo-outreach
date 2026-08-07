@@ -32,6 +32,9 @@ The repository `.dockerignore` excludes `.env`, dependency directories, build
 output, git metadata, logs, and coverage data from the Docker build context.
 Do not remove the `.env` exclusions: the deployment environment contains SMTP
 and database credentials that must never be copied into image build layers.
+The Docker builder supplies a non-secret, unreachable placeholder
+`DATABASE_URL` only while generating Prisma Client and compiling Next.js. Never
+replace it with the runtime database URL or pass the real URL as a build arg.
 
 ## Maintenance commands
 
