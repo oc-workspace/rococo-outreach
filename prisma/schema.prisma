@@ -43,3 +43,49 @@ model EmailSender {
   @@index([status])
   @@map("email_senders")
 }
+
+model EmailCampaign {
+  id           String                  @id @default(cuid())
+  name         String
+  subject      String
+  bodyHtml     String
+  senderId     String?
+  senderEmail  String
+  senderName   String
+  replyToEmail String
+  totalCount   Int                     @default(0)
+  successCount Int                     @default(0)
+  failedCount  Int                     @default(0)
+  repliedCount Int                     @default(0)
+  status       String                  @default("draft")
+  createdAt    DateTime                @default(now())
+  sentAt       DateTime?
+  deliveries   EmailCampaignDelivery[]
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("email_campaigns")
+}
+
+model EmailCampaignDelivery {
+  id                String        @id @default(cuid())
+  campaignId        String
+  campaign          EmailCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contactId         String?
+  toEmail           String
+  renderedSubject   String
+  renderedBodyHtml  String
+  renderedBodyText  String
+  salutation        String        @default("")
+  sendStatus        String        @default("pending")
+  providerMessageId String?
+  errorMessage      String?
+  sentAt            DateTime?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@index([campaignId])
+  @@index([sendStatus])
+  @@index([toEmail])
+  @@map("email_campaign_deliveries")
+}

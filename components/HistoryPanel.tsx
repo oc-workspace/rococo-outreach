@@ -1,6 +1,6 @@
 import type { CampaignRecord } from '@/lib/outreach/types';
 
-export function HistoryPanel({ campaigns }: { campaigns: CampaignRecord[] }) {
+export function HistoryPanel({ campaigns, loading = false, error = null }: { campaigns: CampaignRecord[]; loading?: boolean; error?: string | null }) {
   return (
     <section className="panel">
       <div className="panelHeader">
@@ -10,6 +10,8 @@ export function HistoryPanel({ campaigns }: { campaigns: CampaignRecord[] }) {
         </div>
       </div>
       <div className="panelBody">
+        {loading && <div className="empty">Loading campaign history...</div>}
+        {error && <div className="warning">{error}</div>}
         <div className="historyList">
           {campaigns.map((campaign) => (
             <article className="historyItem" key={campaign.id}>

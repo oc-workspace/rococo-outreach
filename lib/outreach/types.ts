@@ -87,3 +87,7 @@ export interface CampaignRecord {
   sentAt?: string;
   deliveries: DeliveryRecord[];
 }
+
+export interface CampaignListResponse {
+  data: CampaignRecord[];
+}

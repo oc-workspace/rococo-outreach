@@ -49,6 +49,8 @@ export function OutreachApp() {
   const [testSent, setTestSent] = useState(false);
   const [confirmArmed, setConfirmArmed] = useState(false);
   const [campaigns, setCampaigns] = useState<CampaignRecord[]>([]);
+  const [campaignsLoading, setCampaignsLoading] = useState(true);
+  const [campaignsError, setCampaignsError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -69,6 +71,31 @@ export function OutreachApp() {
     }
 
     loadContacts();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadCampaigns() {
+      setCampaignsLoading(true);
+      setCampaignsError(null);
+      try {
+        const response = await fetch('/api/campaigns', { cache: 'no-store' });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok) throw new Error(payload?.error ?? 'Failed to load campaigns');
+        if (!cancelled) setCampaigns(payload?.data ?? []);
+      } catch (error) {
+        if (!cancelled) setCampaignsError(error instanceof Error ? error.message : 'Failed to load campaigns');
+      } finally {
+        if (!cancelled) setCampaignsLoading(false);
+      }
+    }
+
+    loadCampaigns();
 
     return () => {
       cancelled = true;
@@ -302,7 +329,7 @@ export function OutreachApp() {
 
         {activeTab === 'campaign' && (
           <section className="tabPane tabPaneWide">
-            <HistoryPanel campaigns={campaigns} />
+            <HistoryPanel campaigns={campaigns} loading={campaignsLoading} error={campaignsError} />
           </section>
         )}
 
