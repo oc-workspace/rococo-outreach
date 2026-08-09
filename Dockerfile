@@ -12,6 +12,10 @@ RUN apk add --no-cache bash
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED 1
+# This development deployment exposes the in-memory operator-token field in
+# the UI. The API still enforces the server-side token and environment gate.
+ARG NEXT_PUBLIC_OUTREACH_ENV=dev
+ENV NEXT_PUBLIC_OUTREACH_ENV=$NEXT_PUBLIC_OUTREACH_ENV
 # Prisma Client generation requires a syntactically valid URL but does not
 # connect during this build. Never pass the real runtime database secret into
 # the Docker build context or build arguments.

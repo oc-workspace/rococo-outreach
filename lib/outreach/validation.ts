@@ -6,7 +6,7 @@ const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export type SendValidationMode = 'test' | 'real';
 
 export interface SendValidationError {
-  section: 'Campaign draft' | 'Sender settings' | 'Recipients' | 'Test send';
+  section: 'Campaign draft' | 'Sender settings' | 'Recipients' | 'Test send' | 'Operator access';
   message: string;
 }
 

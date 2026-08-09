@@ -11,14 +11,17 @@ interface Props {
   senderName: string;
   senderEmail: string;
   replyToEmail: string;
+  campaignSendToken: string;
+  campaignSending: boolean;
   onTestRecipientEmailChange: (value: string) => void;
+  onCampaignSendTokenChange: (value: string) => void;
   onPreview: () => void;
   onTestSend: () => void;
   onArmConfirm: () => void;
   onRealSend: () => void;
 }
 
-export function PreviewPanel({ renderedEmails, previewed, testSent, confirmArmed, validationErrors, testRecipientEmail, senderName, senderEmail, replyToEmail, onTestRecipientEmailChange, onPreview, onTestSend, onArmConfirm, onRealSend }: Props) {
+export function PreviewPanel({ renderedEmails, previewed, testSent, confirmArmed, validationErrors, testRecipientEmail, senderName, senderEmail, replyToEmail, campaignSendToken, campaignSending, onTestRecipientEmailChange, onCampaignSendTokenChange, onPreview, onTestSend, onArmConfirm, onRealSend }: Props) {
   const warningCount = renderedEmails.reduce((sum, email) => sum + email.warnings.length, 0);
   const groupedErrors = validationErrors.reduce<Record<string, string[]>>((groups, error) => {
     groups[error.section] = [...(groups[error.section] || []), error.message];
@@ -35,11 +38,12 @@ export function PreviewPanel({ renderedEmails, previewed, testSent, confirmArmed
       <div className="panelBody stack">
         <div className="senderPreview"><b>From</b><span>{senderName} &lt;{senderEmail}&gt;</span><b>Reply-to</b><span>{replyToEmail}</span></div>
         <div className="field"><label>Test recipient email</label><input className="input" value={testRecipientEmail} onChange={(event) => onTestRecipientEmailChange(event.target.value)} placeholder="internal-test@rococo.dev" /></div>
+        {process.env.NEXT_PUBLIC_OUTREACH_ENV === 'dev' && <div className="field"><label>Operator token (development only)</label><input className="input" type="password" autoComplete="off" value={campaignSendToken} onChange={(event) => onCampaignSendTokenChange(event.target.value)} placeholder="Enter the server-side send token" /><small className="fieldHint">Used only for this browser request; it is not persisted.</small></div>}
         <div className="rowWrap">
           <button className="button" onClick={onPreview}>Preview</button>
           <button className="button" onClick={onTestSend}>Send test</button>
           {!confirmArmed && <button className="button buttonPrimary" onClick={onArmConfirm}>Confirm real send</button>}
-          {confirmArmed && <button className="button buttonPrimary" onClick={onRealSend}>Send {renderedEmails.length} independent emails</button>}
+          {confirmArmed && <button className="button buttonPrimary" onClick={onRealSend} disabled={campaignSending}>{campaignSending ? 'Sending...' : `Send ${renderedEmails.length} independent emails`}</button>}
           {testSent && <span className="successText">Simulated test complete. No real email sent.</span>}
         </div>
         {!previewed && <div className="empty">Run preview before sending. Send actions will show required-field errors until preview is ready.</div>}
