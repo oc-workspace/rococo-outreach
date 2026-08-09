@@ -67,6 +67,8 @@ export interface DeliveryRecord extends RenderedEmail {
   sendStatus: DeliveryStatus;
   providerMessageId?: string;
   errorMessage?: string;
+  attemptCount: number;
+  lastAttemptAt?: string;
   sentAt?: string;
 }
 

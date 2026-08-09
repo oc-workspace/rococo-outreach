@@ -118,7 +118,7 @@ export async function sendAndPersistCampaign(input: SendCampaignInput, idempoten
   let successCount = 0;
   let failedCount = 0;
   for (const delivery of campaign.deliveries) {
-    await prisma.emailCampaignDelivery.update({ where: { id: delivery.id }, data: { sendStatus: 'sending' } });
+    await prisma.emailCampaignDelivery.update({ where: { id: delivery.id }, data: { sendStatus: 'sending', attemptCount: { increment: 1 }, lastAttemptAt: new Date() } });
     try {
       const result = await transport.send({
         from: senderEmail,
@@ -147,6 +147,92 @@ export async function sendAndPersistCampaign(input: SendCampaignInput, idempoten
     data: { successCount, failedCount, status: failedCount > 0 ? 'partial_failed' : 'sent', sentAt: new Date() },
     include: { deliveries: { orderBy: { createdAt: 'asc' } } },
   });
+}
+
+export async function retryFailedCampaign(campaignId: string, idempotencyKey: string) {
+  if (!isValidIdempotencyKey(idempotencyKey)) throw new CampaignSendError(400, 'A valid Idempotency-Key header is required');
+
+  const existingRetry = await prisma.emailCampaignRetry.findUnique({
+    where: { idempotencyKey },
+    include: { campaign: { include: { deliveries: { orderBy: { createdAt: 'asc' } } } } },
+  });
+  if (existingRetry) return existingRetry.campaign;
+
+  const campaign = await prisma.emailCampaign.findUnique({
+    where: { id: campaignId },
+    include: { deliveries: { orderBy: { createdAt: 'asc' } } },
+  });
+  if (!campaign) throw new CampaignSendError(404, 'Campaign not found');
+
+  const failedDeliveries = campaign.deliveries.filter((delivery) => delivery.sendStatus === 'failed');
+  if (failedDeliveries.length === 0) return campaign;
+
+  const sender = await prisma.emailSender.findUnique({ where: { id: campaign.senderId ?? '' } });
+  if (!sender || sender.status !== 'active' || !sender.domainVerified || !sender.senderVerified) {
+    throw new CampaignSendError(409, 'Campaign sender is not eligible for retry');
+  }
+  const config = readTencentEnterpriseMailConfig();
+  if (sender.email.trim().toLowerCase() !== config.user.trim().toLowerCase() || campaign.senderEmail.trim().toLowerCase() !== config.user.trim().toLowerCase()) {
+    throw new CampaignSendError(409, 'Campaign sender does not match the connected SMTP mailbox');
+  }
+
+  let retryRequest;
+  try {
+    retryRequest = await prisma.emailCampaignRetry.create({
+      data: { campaignId: campaign.id, idempotencyKey, status: 'sending' },
+    });
+  } catch (error) {
+    if (!isUniqueConstraintError(error)) throw error;
+    const concurrentRetry = await prisma.emailCampaignRetry.findUnique({
+      where: { idempotencyKey },
+      include: { campaign: { include: { deliveries: { orderBy: { createdAt: 'asc' } } } } },
+    });
+    if (concurrentRetry) return concurrentRetry.campaign;
+    throw error;
+  }
+
+  const transport = createTencentEnterpriseMailTransport();
+  for (const delivery of failedDeliveries) {
+    const claim = await prisma.emailCampaignDelivery.updateMany({
+      where: { id: delivery.id, sendStatus: 'failed' },
+      data: { sendStatus: 'sending', attemptCount: { increment: 1 }, lastAttemptAt: new Date() },
+    });
+    if (claim.count === 0) continue;
+
+    try {
+      const result = await transport.send({
+        from: campaign.senderEmail,
+        replyTo: campaign.replyToEmail,
+        to: delivery.toEmail,
+        subject: delivery.renderedSubject,
+        html: delivery.renderedBodyHtml,
+        text: delivery.renderedBodyText,
+      });
+      const accepted = result.accepted.some((value) => value.trim().toLowerCase() === delivery.toEmail) && result.rejected.length === 0;
+      if (accepted) {
+        await prisma.emailCampaignDelivery.update({ where: { id: delivery.id }, data: { sendStatus: 'sent', providerMessageId: result.messageId, errorMessage: null, sentAt: new Date() } });
+      } else {
+        await prisma.emailCampaignDelivery.update({ where: { id: delivery.id }, data: { sendStatus: 'failed', errorMessage: 'SMTP rejected recipient' } });
+      }
+    } catch (error) {
+      await prisma.emailCampaignDelivery.update({ where: { id: delivery.id }, data: { sendStatus: 'failed', errorMessage: safeSendError(error) } });
+    }
+  }
+
+  const latest = await prisma.emailCampaign.findUnique({
+    where: { id: campaign.id },
+    include: { deliveries: { orderBy: { createdAt: 'asc' } } },
+  });
+  if (!latest) throw new CampaignSendError(404, 'Campaign not found');
+  const successCount = latest.deliveries.filter((delivery) => delivery.sendStatus === 'sent').length;
+  const failedCount = latest.deliveries.filter((delivery) => delivery.sendStatus === 'failed').length;
+  const updated = await prisma.emailCampaign.update({
+    where: { id: campaign.id },
+    data: { successCount, failedCount, status: failedCount > 0 ? 'partial_failed' : 'sent', sentAt: new Date() },
+    include: { deliveries: { orderBy: { createdAt: 'asc' } } },
+  });
+  await prisma.emailCampaignRetry.update({ where: { id: retryRequest.id }, data: { status: 'completed', completedAt: new Date() } });
+  return updated;
 }
 
 function isUniqueConstraintError(error: unknown): boolean {

@@ -11,6 +11,8 @@ type DeliveryRecordRow = {
   sendStatus: string;
   providerMessageId: string | null;
   errorMessage: string | null;
+  attemptCount: number;
+  lastAttemptAt: Date | null;
   sentAt: Date | null;
 };
 
@@ -71,6 +73,8 @@ export function toCampaignRecord(row: CampaignRecordRow): CampaignRecord {
       sendStatus: toDeliveryStatus(delivery.sendStatus),
       providerMessageId: delivery.providerMessageId ?? undefined,
       errorMessage: delivery.errorMessage ?? undefined,
+      attemptCount: delivery.attemptCount,
+      lastAttemptAt: delivery.lastAttemptAt?.toISOString(),
       sentAt: delivery.sentAt?.toISOString(),
     })),
   };

@@ -53,6 +53,7 @@ export function OutreachApp() {
   const [campaignSendToken, setCampaignSendToken] = useState('');
   const [campaignSending, setCampaignSending] = useState(false);
   const [campaignIdempotencyKey, setCampaignIdempotencyKey] = useState('');
+  const [retryingCampaignId, setRetryingCampaignId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -309,6 +310,33 @@ export function OutreachApp() {
     }
   }
 
+  async function retryFailedCampaign(campaignId: string) {
+    if (!campaignSendToken.trim()) {
+      setCampaignsError('Operator token is required to retry failed recipients. Enter it in Compose first.');
+      return;
+    }
+    setRetryingCampaignId(campaignId);
+    setCampaignsError(null);
+    try {
+      const response = await fetch(`/api/campaigns/${campaignId}/retry-failed`, {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${campaignSendToken.trim()}`,
+          'idempotency-key': crypto.randomUUID(),
+        },
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error ?? 'Campaign retry failed');
+      const campaign = payload?.data as CampaignRecord | undefined;
+      if (!campaign) throw new Error('Campaign retry returned no campaign record');
+      setCampaigns((current) => current.map((item) => item.id === campaign.id ? campaign : item));
+    } catch (error) {
+      setCampaignsError(error instanceof Error ? error.message : 'Campaign retry failed');
+    } finally {
+      setRetryingCampaignId(null);
+    }
+  }
+
   function updateSender(senderId: string) {
     const nextSender = senders.find((sender) => sender.id === senderId);
     setSelectedSenderId(senderId);
@@ -364,7 +392,7 @@ export function OutreachApp() {
 
         {activeTab === 'campaign' && (
           <section className="tabPane tabPaneWide">
-            <HistoryPanel campaigns={campaigns} loading={campaignsLoading} error={campaignsError} />
+            <HistoryPanel campaigns={campaigns} loading={campaignsLoading} error={campaignsError} onRetry={retryFailedCampaign} retryingCampaignId={retryingCampaignId} />
           </section>
         )}
 

@@ -62,6 +62,7 @@ model EmailCampaign {
   createdAt    DateTime                @default(now())
   sentAt       DateTime?
   deliveries   EmailCampaignDelivery[]
+  retries      EmailCampaignRetry[]
 
   @@index([status])
   @@index([createdAt])
@@ -81,6 +82,8 @@ model EmailCampaignDelivery {
   sendStatus        String        @default("pending")
   providerMessageId String?
   errorMessage      String?
+  attemptCount      Int           @default(0)
+  lastAttemptAt     DateTime?
   sentAt            DateTime?
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
@@ -89,4 +92,18 @@ model EmailCampaignDelivery {
   @@index([sendStatus])
   @@index([toEmail])
   @@map("email_campaign_deliveries")
+}
+
+model EmailCampaignRetry {
+  id             String        @id @default(cuid())
+  campaignId     String
+  campaign       EmailCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  idempotencyKey String        @unique
+  status         String        @default("sending")
+  createdAt      DateTime      @default(now())
+  completedAt    DateTime?
+
+  @@index([campaignId])
+  @@index([status])
+  @@map("email_campaign_retries")
 }

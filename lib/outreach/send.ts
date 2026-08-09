@@ -8,6 +8,8 @@ export function sendCampaignOneByOne(params: { name: string; draft: EmailDraft; 
     sendStatus: email.warnings.length ? 'failed' : 'sent',
     providerMessageId: email.warnings.length ? undefined : `simulated-${Date.now()}-${index}`,
     errorMessage: email.warnings.length ? email.warnings.join(' ') : undefined,
+    attemptCount: 1,
+    lastAttemptAt: now,
     sentAt: email.warnings.length ? undefined : now,
   }));
   const successCount = deliveries.filter((item) => item.sendStatus === 'sent').length;
