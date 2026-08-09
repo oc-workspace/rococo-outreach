@@ -46,6 +46,7 @@ model EmailSender {
 
 model EmailCampaign {
   id           String                  @id @default(cuid())
+  idempotencyKey String?               @unique
   name         String
   subject      String
   bodyHtml     String

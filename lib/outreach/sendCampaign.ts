@@ -16,6 +16,10 @@ export interface SendCampaignInput {
   deliveries: Array<Pick<RenderedEmail, 'contactId' | 'to' | 'subject' | 'bodyHtml' | 'bodyText' | 'salutation'> & { warnings?: string[] }>;
 }
 
+export function isValidIdempotencyKey(value: string): boolean {
+  return /^[A-Za-z0-9._:-]{8,128}$/.test(value);
+}
+
 export class CampaignSendError extends Error {
   constructor(public readonly status: number, message: string) {
     super(message);
@@ -23,7 +27,14 @@ export class CampaignSendError extends Error {
   }
 }
 
-export async function sendAndPersistCampaign(input: SendCampaignInput) {
+export async function sendAndPersistCampaign(input: SendCampaignInput, idempotencyKey: string) {
+  if (!isValidIdempotencyKey(idempotencyKey)) throw new CampaignSendError(400, 'A valid Idempotency-Key header is required');
+  const existing = await prisma.emailCampaign.findUnique({
+    where: { idempotencyKey },
+    include: { deliveries: { orderBy: { createdAt: 'asc' } } },
+  });
+  if (existing) return existing;
+
   if (!input || typeof input !== 'object') throw new CampaignSendError(400, 'Invalid campaign payload');
   if (typeof input.senderId !== 'string' || typeof input.senderEmail !== 'string' || typeof input.senderName !== 'string' || typeof input.replyToEmail !== 'string') {
     throw new CampaignSendError(400, 'Sender fields are required');
@@ -76,21 +87,33 @@ export async function sendAndPersistCampaign(input: SendCampaignInput) {
   }
 
   const transport = createTencentEnterpriseMailTransport();
-  const campaign = await prisma.emailCampaign.create({
-    data: {
-      name,
-      subject,
-      bodyHtml,
-      senderId: sender.id,
-      senderEmail,
-      senderName,
-      replyToEmail,
-      totalCount: normalizedDeliveries.length,
-      status: 'sending',
-      deliveries: { create: normalizedDeliveries },
-    },
-    include: { deliveries: { orderBy: { createdAt: 'asc' } } },
-  });
+  let campaign;
+  try {
+    campaign = await prisma.emailCampaign.create({
+      data: {
+        idempotencyKey,
+        name,
+        subject,
+        bodyHtml,
+        senderId: sender.id,
+        senderEmail,
+        senderName,
+        replyToEmail,
+        totalCount: normalizedDeliveries.length,
+        status: 'sending',
+        deliveries: { create: normalizedDeliveries },
+      },
+      include: { deliveries: { orderBy: { createdAt: 'asc' } } },
+    });
+  } catch (error) {
+    if (!isUniqueConstraintError(error)) throw error;
+    const concurrentCampaign = await prisma.emailCampaign.findUnique({
+      where: { idempotencyKey },
+      include: { deliveries: { orderBy: { createdAt: 'asc' } } },
+    });
+    if (concurrentCampaign) return concurrentCampaign;
+    throw error;
+  }
 
   let successCount = 0;
   let failedCount = 0;
@@ -124,6 +147,10 @@ export async function sendAndPersistCampaign(input: SendCampaignInput) {
     data: { successCount, failedCount, status: failedCount > 0 ? 'partial_failed' : 'sent', sentAt: new Date() },
     include: { deliveries: { orderBy: { createdAt: 'asc' } } },
   });
+}
+
+function isUniqueConstraintError(error: unknown): boolean {
+  return Boolean(error && typeof error === 'object' && (error as { code?: unknown }).code === 'P2002');
 }
 
 function safeSendError(error: unknown): string {

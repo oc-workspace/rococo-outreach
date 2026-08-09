@@ -52,6 +52,7 @@ export function OutreachApp() {
   const [campaignsError, setCampaignsError] = useState<string | null>(null);
   const [campaignSendToken, setCampaignSendToken] = useState('');
   const [campaignSending, setCampaignSending] = useState(false);
+  const [campaignIdempotencyKey, setCampaignIdempotencyKey] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -153,6 +154,7 @@ export function OutreachApp() {
     setTestSent(false);
     setConfirmArmed(false);
     setValidationErrors([]);
+    setCampaignIdempotencyKey('');
   }
 
   function getSendValidationErrors(mode: SendValidationMode) {
@@ -262,6 +264,7 @@ export function OutreachApp() {
     const errors = getSendValidationErrors('real');
     setValidationErrors(errors);
     if (errors.length > 0) return;
+    setCampaignIdempotencyKey((current) => current || crypto.randomUUID());
     setConfirmArmed(true);
   }
 
@@ -278,6 +281,7 @@ export function OutreachApp() {
         headers: {
           'content-type': 'application/json',
           authorization: `Bearer ${campaignSendToken.trim()}`,
+          'idempotency-key': campaignIdempotencyKey || crypto.randomUUID(),
         },
         body: JSON.stringify({
           name: campaignName,
@@ -295,6 +299,7 @@ export function OutreachApp() {
       const campaign = payload?.data as CampaignRecord | undefined;
       if (!campaign) throw new Error('Campaign send returned no campaign record');
       setCampaigns((current) => [campaign, ...current.filter((item) => item.id !== campaign.id)]);
+      setCampaignIdempotencyKey('');
       setConfirmArmed(false);
       setActiveTab('campaign');
     } catch (error) {
