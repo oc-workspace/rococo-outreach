@@ -15,11 +15,16 @@ interface Props {
   onToggleVisibleContacts: (ids: string[], selected: boolean) => void;
   onAddSelectedToCampaign: () => void;
   onImported: () => void;
+  statusFilter: ContactStatus | 'all';
+  tagFilter: string;
+  availableTags: string[];
+  onStatusFilterChange: (value: ContactStatus | 'all') => void;
+  onTagFilterChange: (value: string) => void;
 }
 
 const statusOptions: ContactStatus[] = ['active', 'inactive', 'blocked'];
 
-export function ContactPanel({ contacts, query, onQueryChange, onAddContact, newlySavedContactId, onUpdateContact, onRemoveContact, selectedContactIds, onToggleContact, onToggleVisibleContacts, onAddSelectedToCampaign, onImported }: Props) {
+export function ContactPanel({ contacts, query, onQueryChange, onAddContact, newlySavedContactId, onUpdateContact, onRemoveContact, selectedContactIds, onToggleContact, onToggleVisibleContacts, onAddSelectedToCampaign, onImported, statusFilter, tagFilter, availableTags, onStatusFilterChange, onTagFilterChange }: Props) {
   const [expandedContactId, setExpandedContactId] = useState<string | null>(null);
   const [showImport, setShowImport] = useState(false);
 
@@ -51,6 +56,10 @@ export function ContactPanel({ contacts, query, onQueryChange, onAddContact, new
       <div className="panelBody stack">
         {showImport && <ContactCsvImport onImported={onImported} />}
         <input className="input" value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder="Search email, company, media, tag" />
+        <div className="row contactFilters">
+          <div className="field"><label htmlFor="contact-status-filter">Status</label><select id="contact-status-filter" className="select" value={statusFilter} onChange={(event) => onStatusFilterChange(event.target.value as ContactStatus | 'all')}><option value="all">All statuses</option>{statusOptions.map((status) => <option key={status} value={status}>{status}</option>)}</select></div>
+          <div className="field"><label htmlFor="contact-tag-filter">Tag</label><select id="contact-tag-filter" className="select" value={tagFilter} onChange={(event) => onTagFilterChange(event.target.value)}><option value="">All tags</option>{availableTags.map((tag) => <option key={tag} value={tag}>{tag}</option>)}</select></div>
+        </div>
         <div className="rowWrap selectionToolbar">
           <label className="checkboxLabel"><input type="checkbox" checked={allVisibleSelected} disabled={selectableVisibleIds.length === 0} onChange={(event) => onToggleVisibleContacts(selectableVisibleIds, event.target.checked)} /> Select visible</label>
           <span className="pill">selected {selectedContactIds.length}</span>

@@ -10,7 +10,7 @@ import { SenderSettings } from './SenderSettings';
 import { initialDraft, initialRecipients } from '@/lib/outreach/seed';
 import { hasDuplicateRecipients, renderRecipientEmail } from '@/lib/outreach/render';
 import { validateCampaignSend } from '@/lib/outreach/validation';
-import type { CampaignRecord, EmailContact, EmailDraft, EmailSender, RecipientRow } from '@/lib/outreach/types';
+import type { CampaignRecord, ContactStatus, EmailContact, EmailDraft, EmailSender, RecipientRow } from '@/lib/outreach/types';
 import type { SendValidationError, SendValidationMode } from '@/lib/outreach/validation';
 
 type WorkspaceTab = 'contacts' | 'campaign' | 'compose';
@@ -33,6 +33,8 @@ export function OutreachApp() {
   const [contactsLoading, setContactsLoading] = useState(true);
   const [contactsError, setContactsError] = useState<string | null>(null);
   const [contactQuery, setContactQuery] = useState('');
+  const [contactStatusFilter, setContactStatusFilter] = useState<ContactStatus | 'all'>('all');
+  const [contactTagFilter, setContactTagFilter] = useState('');
   const [selectedContactIds, setSelectedContactIds] = useState<string[]>([]);
   const [newlySavedContactId, setNewlySavedContactId] = useState<string | null>(null);
   const [campaignName, setCampaignName] = useState('July media outreach');
@@ -141,9 +143,15 @@ export function OutreachApp() {
 
   const filteredContacts = useMemo(() => {
     const needle = contactQuery.trim().toLowerCase();
-    if (!needle) return contacts;
-    return contacts.filter((contact) => [contact.email, contact.displayName, contact.company, contact.mediaName, contact.role, contact.country, ...contact.tags].join(' ').toLowerCase().includes(needle));
-  }, [contacts, contactQuery]);
+    return contacts.filter((contact) => {
+      if (contactStatusFilter !== 'all' && contact.status !== contactStatusFilter) return false;
+      if (contactTagFilter && !contact.tags.includes(contactTagFilter)) return false;
+      if (!needle) return true;
+      return [contact.email, contact.displayName, contact.company, contact.mediaName, contact.role, contact.country, ...contact.tags].join(' ').toLowerCase().includes(needle);
+    });
+  }, [contacts, contactQuery, contactStatusFilter, contactTagFilter]);
+
+  const availableContactTags = useMemo(() => Array.from(new Set(contacts.flatMap((contact) => contact.tags))).sort((left, right) => left.localeCompare(right)), [contacts]);
 
   const renderedEmails = useMemo(() => rows.map((row) => renderRecipientEmail(draft, row, contacts)), [contacts, draft, rows]);
   const selectedSender = senders.find((sender) => sender.id === selectedSenderId);
@@ -429,7 +437,7 @@ export function OutreachApp() {
 
         {activeTab === 'contacts' && (
           <section className="tabPane tabPaneWide">
-            <ContactPanel contacts={filteredContacts} query={contactQuery} onQueryChange={setContactQuery} onAddContact={addContact} newlySavedContactId={newlySavedContactId} onUpdateContact={updateContact} onRemoveContact={removeContact} selectedContactIds={selectedContactIds} onToggleContact={toggleContactSelection} onToggleVisibleContacts={toggleVisibleContactSelection} onAddSelectedToCampaign={addSelectedContactsToCampaign} onImported={refreshContacts} />
+            <ContactPanel contacts={filteredContacts} query={contactQuery} onQueryChange={setContactQuery} onAddContact={addContact} newlySavedContactId={newlySavedContactId} onUpdateContact={updateContact} onRemoveContact={removeContact} selectedContactIds={selectedContactIds} onToggleContact={toggleContactSelection} onToggleVisibleContacts={toggleVisibleContactSelection} onAddSelectedToCampaign={addSelectedContactsToCampaign} onImported={refreshContacts} statusFilter={contactStatusFilter} tagFilter={contactTagFilter} availableTags={availableContactTags} onStatusFilterChange={setContactStatusFilter} onTagFilterChange={setContactTagFilter} />
           </section>
         )}
 
