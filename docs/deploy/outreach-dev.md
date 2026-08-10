@@ -76,6 +76,30 @@ During migration, HTTP/API health checks, PostgreSQL table counts, GitHub push
 dry-run, restricted deployment, domain binding, and SMTP TLS connections on
 ports 465 and 587 were verified successfully from the target environment.
 
+## Server-side sing-box route exceptions
+
+`netcup2` runs a host-level sing-box TUN for outbound traffic. Public service
+responses must bypass that TUN so the reply leaves through the same `eth0` path
+that received the request. The persistent systemd drop-in is:
+
+```text
+/etc/systemd/system/sing-box.service.d/public-service-routes.conf
+```
+
+It installs IPv4 and IPv6 policy rules before sing-box automatic rules:
+
+```text
+priority 8997: TCP source port 80  -> main routing table
+priority 8998: TCP source port 443 -> main routing table
+priority 8999: TCP source port 22  -> main routing table
+```
+
+Without the 80/443 exceptions, external HTTP requests time out and HTTPS stalls
+during the TLS handshake because Nginx responses return through `singtun0`
+instead of `eth0`. After changing these rules, verify `systemctl is-active
+sing-box`, `ip rule show`, direct HTTPS, and HTTPS through the operator's normal
+proxy/TUN path.
+
 ## SMTP test endpoint
 
 The development-only SMTP diagnostic endpoint is disabled unless
