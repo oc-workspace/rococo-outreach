@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db/prisma';
 import { createTencentEnterpriseMailTransport, readTencentEnterpriseMailConfig } from '@/lib/mail/transportFactory';
+import type { MailTransport } from '@/lib/mail/transport';
 import type { RenderedEmail } from './types';
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -16,6 +17,10 @@ export interface SendCampaignInput {
   deliveries: Array<Pick<RenderedEmail, 'contactId' | 'to' | 'subject' | 'bodyHtml' | 'bodyText' | 'salutation'> & { warnings?: string[] }>;
 }
 
+export interface CampaignSendOptions {
+  transport?: MailTransport;
+}
+
 export function isValidIdempotencyKey(value: string): boolean {
   return /^[A-Za-z0-9._:-]{8,128}$/.test(value);
 }
@@ -27,7 +32,7 @@ export class CampaignSendError extends Error {
   }
 }
 
-export async function sendAndPersistCampaign(input: SendCampaignInput, idempotencyKey: string) {
+export async function sendAndPersistCampaign(input: SendCampaignInput, idempotencyKey: string, options: CampaignSendOptions = {}) {
   if (!isValidIdempotencyKey(idempotencyKey)) throw new CampaignSendError(400, 'A valid Idempotency-Key header is required');
   const existing = await prisma.emailCampaign.findUnique({
     where: { idempotencyKey },
@@ -86,7 +91,7 @@ export async function sendAndPersistCampaign(input: SendCampaignInput, idempoten
     seen.add(delivery.toEmail);
   }
 
-  const transport = createTencentEnterpriseMailTransport();
+  const transport = options.transport ?? createTencentEnterpriseMailTransport();
   let campaign;
   try {
     campaign = await prisma.emailCampaign.create({
@@ -149,7 +154,7 @@ export async function sendAndPersistCampaign(input: SendCampaignInput, idempoten
   });
 }
 
-export async function retryFailedCampaign(campaignId: string, idempotencyKey: string) {
+export async function retryFailedCampaign(campaignId: string, idempotencyKey: string, options: CampaignSendOptions = {}) {
   if (!isValidIdempotencyKey(idempotencyKey)) throw new CampaignSendError(400, 'A valid Idempotency-Key header is required');
 
   const existingRetry = await prisma.emailCampaignRetry.findUnique({
@@ -191,7 +196,7 @@ export async function retryFailedCampaign(campaignId: string, idempotencyKey: st
     throw error;
   }
 
-  const transport = createTencentEnterpriseMailTransport();
+  const transport = options.transport ?? createTencentEnterpriseMailTransport();
   for (const delivery of failedDeliveries) {
     const claim = await prisma.emailCampaignDelivery.updateMany({
       where: { id: delivery.id, sendStatus: 'failed' },

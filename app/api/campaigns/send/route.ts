@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { createSimulatedMailTransport, readSimulationFailureRecipient, SimulationInputError } from '@/lib/mail/simulatedTransport';
 import { authorizeDevOutreachToken } from '@/lib/outreach/apiAuth';
 import { toCampaignRecord } from '@/lib/outreach/campaigns';
 import { CampaignSendError, isValidIdempotencyKey, sendAndPersistCampaign, type SendCampaignInput } from '@/lib/outreach/sendCampaign';
@@ -16,10 +17,16 @@ export async function POST(request: Request) {
   if (!payload) return privateJson({ error: 'Invalid request body' }, { status: 400 });
 
   try {
-    const campaign = await sendAndPersistCampaign(payload as SendCampaignInput, idempotencyKey);
+    const simulationFailureRecipient = readSimulationFailureRecipient(request);
+    const campaign = await sendAndPersistCampaign(
+      payload as SendCampaignInput,
+      idempotencyKey,
+      simulationFailureRecipient ? { transport: createSimulatedMailTransport(simulationFailureRecipient) } : undefined,
+    );
     return privateJson({ data: toCampaignRecord(campaign) });
   } catch (error) {
     if (error instanceof CampaignSendError) return privateJson({ error: error.message }, { status: error.status });
+    if (error instanceof SimulationInputError) return privateJson({ error: error.message }, { status: error.status });
     return privateJson({ error: 'Campaign send failed' }, { status: 502 });
   }
 }
