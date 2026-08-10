@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ContactStatus, EmailContact } from '@/lib/outreach/types';
+import { ContactCsvImport } from './ContactCsvImport';
 
 interface Props {
   contacts: EmailContact[];
@@ -9,12 +10,18 @@ interface Props {
   newlySavedContactId?: string | null;
   onUpdateContact: (id: string, patch: Partial<EmailContact>) => void;
   onRemoveContact: (id: string) => void;
+  selectedContactIds: string[];
+  onToggleContact: (id: string) => void;
+  onToggleVisibleContacts: (ids: string[], selected: boolean) => void;
+  onAddSelectedToCampaign: () => void;
+  onImported: () => void;
 }
 
 const statusOptions: ContactStatus[] = ['active', 'inactive', 'blocked'];
 
-export function ContactPanel({ contacts, query, onQueryChange, onAddContact, newlySavedContactId, onUpdateContact, onRemoveContact }: Props) {
+export function ContactPanel({ contacts, query, onQueryChange, onAddContact, newlySavedContactId, onUpdateContact, onRemoveContact, selectedContactIds, onToggleContact, onToggleVisibleContacts, onAddSelectedToCampaign, onImported }: Props) {
   const [expandedContactId, setExpandedContactId] = useState<string | null>(null);
+  const [showImport, setShowImport] = useState(false);
 
   useEffect(() => {
     if (newlySavedContactId) {
@@ -26,6 +33,9 @@ export function ContactPanel({ contacts, query, onQueryChange, onAddContact, new
     setExpandedContactId((current) => (current === contactId ? null : contactId));
   }
 
+  const selectableVisibleIds = contacts.filter((contact) => contact.email && contact.status !== 'blocked').map((contact) => contact.id);
+  const allVisibleSelected = selectableVisibleIds.length > 0 && selectableVisibleIds.every((id) => selectedContactIds.includes(id));
+
   return (
     <section className="panel">
       <div className="panelHeader">
@@ -33,12 +43,22 @@ export function ContactPanel({ contacts, query, onQueryChange, onAddContact, new
           <h2 className="panelTitle">Contacts</h2>
           <p className="panelNote">Scan key contact fields first. Open detail only when editing is needed.</p>
         </div>
-        <button className="button buttonSmall" onClick={onAddContact}>+</button>
+        <div className="rowWrap">
+          <button className="button buttonSmall" type="button" onClick={() => setShowImport((current) => !current)}>{showImport ? 'Hide import' : 'Import CSV'}</button>
+          <button className="button buttonSmall" type="button" onClick={onAddContact}>+</button>
+        </div>
       </div>
       <div className="panelBody stack">
+        {showImport && <ContactCsvImport onImported={onImported} />}
         <input className="input" value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder="Search email, company, media, tag" />
+        <div className="rowWrap selectionToolbar">
+          <label className="checkboxLabel"><input type="checkbox" checked={allVisibleSelected} disabled={selectableVisibleIds.length === 0} onChange={(event) => onToggleVisibleContacts(selectableVisibleIds, event.target.checked)} /> Select visible</label>
+          <span className="pill">selected {selectedContactIds.length}</span>
+          <button className="button buttonPrimary buttonSmall" type="button" onClick={onAddSelectedToCampaign} disabled={selectedContactIds.length === 0}>Add selected to Campaign</button>
+        </div>
         <div className="contactList contactTable" role="table" aria-label="Contacts">
           <div className="contactTableHeader" role="row">
+            <span aria-hidden="true" />
             <span>Name</span>
             <span>Email</span>
             <span>Company</span>
@@ -48,9 +68,12 @@ export function ContactPanel({ contacts, query, onQueryChange, onAddContact, new
           </div>
           {contacts.map((contact) => {
             const isExpanded = expandedContactId === contact.id;
+            const isSelected = selectedContactIds.includes(contact.id);
+            const selectionDisabled = !contact.email || contact.status === 'blocked';
             return (
               <article className="contactTableItem" key={contact.id}>
                 <div className="contactSummaryRow" role="row">
+                  <span className="contactSelectCell"><input type="checkbox" checked={isSelected} disabled={selectionDisabled} onChange={() => onToggleContact(contact.id)} aria-label={`Select ${contact.email || 'contact'}`} /></span>
                   <span className="contactName" title={contact.displayName || 'Unnamed contact'}>{contact.displayName || 'Unnamed contact'}</span>
                   <span className="contactEmail" title={contact.email}>{contact.email || '-'}</span>
                   <span className="contactEmail" title={contact.company}>{contact.company || '-'}</span>

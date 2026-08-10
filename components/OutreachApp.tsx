@@ -33,6 +33,7 @@ export function OutreachApp() {
   const [contactsLoading, setContactsLoading] = useState(true);
   const [contactsError, setContactsError] = useState<string | null>(null);
   const [contactQuery, setContactQuery] = useState('');
+  const [selectedContactIds, setSelectedContactIds] = useState<string[]>([]);
   const [newlySavedContactId, setNewlySavedContactId] = useState<string | null>(null);
   const [campaignName, setCampaignName] = useState('July media outreach');
   const [senders, setSenders] = useState<EmailSender[]>([]);
@@ -216,6 +217,7 @@ export function OutreachApp() {
     const previousContacts = contacts;
     setContactsError(null);
     setContacts((current) => current.filter((contact) => contact.id !== id));
+    setSelectedContactIds((current) => current.filter((contactId) => contactId !== id));
     setRows((current) => current.map((row) => row.contactId === id ? { ...row, contactId: '' } : row));
     resetSendGuards();
 
@@ -226,6 +228,47 @@ export function OutreachApp() {
       setContacts(previousContacts);
       setContactsError(error instanceof Error ? error.message : 'Failed to remove contact');
     }
+  }
+
+  async function refreshContacts() {
+    setContactsLoading(true);
+    setContactsError(null);
+    try {
+      const response = await fetch('/api/contacts', { cache: 'no-store' });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error ?? 'Failed to load contacts');
+      setContacts(payload?.data ?? []);
+    } catch (error) {
+      setContactsError(error instanceof Error ? error.message : 'Failed to load contacts');
+    } finally {
+      setContactsLoading(false);
+    }
+  }
+
+  function toggleContactSelection(contactId: string) {
+    setSelectedContactIds((current) => current.includes(contactId) ? current.filter((id) => id !== contactId) : [...current, contactId]);
+  }
+
+  function toggleVisibleContactSelection(ids: string[], selected: boolean) {
+    setSelectedContactIds((current) => selected ? Array.from(new Set([...current, ...ids])) : current.filter((id) => !ids.includes(id)));
+  }
+
+  function addSelectedContactsToCampaign() {
+    const selected = contacts.filter((contact) => selectedContactIds.includes(contact.id) && contact.email && contact.status !== 'blocked');
+    const existingEmails = new Set(rows.map((row) => row.email.trim().toLowerCase()).filter(Boolean));
+    const additions = selected.filter((contact) => {
+      const email = contact.email.trim().toLowerCase();
+      if (existingEmails.has(email)) return false;
+      existingEmails.add(email);
+      return true;
+    }).map((contact) => ({ id: newId('row'), contactId: contact.id, email: contact.email, language: contact.language || 'en', salutation: contact.salutation }));
+
+    if (additions.length > 0) {
+      setRows((current) => [...current, ...additions]);
+      resetSendGuards();
+      setActiveTab('compose');
+    }
+    setSelectedContactIds([]);
   }
 
   function updateDraft(patch: Partial<EmailDraft>) {
@@ -386,7 +429,7 @@ export function OutreachApp() {
 
         {activeTab === 'contacts' && (
           <section className="tabPane tabPaneWide">
-            <ContactPanel contacts={filteredContacts} query={contactQuery} onQueryChange={setContactQuery} onAddContact={addContact} newlySavedContactId={newlySavedContactId} onUpdateContact={updateContact} onRemoveContact={removeContact} />
+            <ContactPanel contacts={filteredContacts} query={contactQuery} onQueryChange={setContactQuery} onAddContact={addContact} newlySavedContactId={newlySavedContactId} onUpdateContact={updateContact} onRemoveContact={removeContact} selectedContactIds={selectedContactIds} onToggleContact={toggleContactSelection} onToggleVisibleContacts={toggleVisibleContactSelection} onAddSelectedToCampaign={addSelectedContactsToCampaign} onImported={refreshContacts} />
           </section>
         )}
 
