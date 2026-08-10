@@ -31,6 +31,17 @@ export interface EmailDraft {
   updatedAt: string;
 }
 
+export interface EmailTemplateRecord {
+  id: string;
+  name: string;
+  description: string;
+  subject: string;
+  bodyHtml: string;
+  status: 'active' | 'archived' | string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface RecipientRow {
   id: string;
   contactId: string;

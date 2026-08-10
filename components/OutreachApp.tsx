@@ -10,7 +10,7 @@ import { SenderSettings } from './SenderSettings';
 import { initialDraft, initialRecipients } from '@/lib/outreach/seed';
 import { hasDuplicateRecipients, renderRecipientEmail } from '@/lib/outreach/render';
 import { validateCampaignSend } from '@/lib/outreach/validation';
-import type { CampaignRecord, ContactStatus, EmailContact, EmailDraft, EmailSender, RecipientRow } from '@/lib/outreach/types';
+import type { CampaignRecord, ContactStatus, EmailContact, EmailDraft, EmailSender, EmailTemplateRecord, RecipientRow } from '@/lib/outreach/types';
 import type { SendValidationError, SendValidationMode } from '@/lib/outreach/validation';
 
 type WorkspaceTab = 'contacts' | 'campaign' | 'compose';
@@ -53,6 +53,9 @@ export function OutreachApp() {
   const [campaigns, setCampaigns] = useState<CampaignRecord[]>([]);
   const [campaignsLoading, setCampaignsLoading] = useState(true);
   const [campaignsError, setCampaignsError] = useState<string | null>(null);
+  const [templates, setTemplates] = useState<EmailTemplateRecord[]>([]);
+  const [templatesLoading, setTemplatesLoading] = useState(true);
+  const [templatesError, setTemplatesError] = useState<string | null>(null);
   const [campaignSendToken, setCampaignSendToken] = useState('');
   const [campaignSending, setCampaignSending] = useState(false);
   const [campaignIdempotencyKey, setCampaignIdempotencyKey] = useState('');
@@ -77,6 +80,31 @@ export function OutreachApp() {
     }
 
     loadContacts();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadTemplates() {
+      setTemplatesLoading(true);
+      setTemplatesError(null);
+      try {
+        const response = await fetch('/api/templates', { cache: 'no-store' });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok) throw new Error(payload?.error ?? 'Failed to load templates');
+        if (!cancelled) setTemplates(payload?.data ?? []);
+      } catch (error) {
+        if (!cancelled) setTemplatesError(error instanceof Error ? error.message : 'Failed to load templates');
+      } finally {
+        if (!cancelled) setTemplatesLoading(false);
+      }
+    }
+
+    loadTemplates();
 
     return () => {
       cancelled = true;
@@ -284,6 +312,25 @@ export function OutreachApp() {
     resetSendGuards();
   }
 
+  function applyTemplate(template: EmailTemplateRecord) {
+    setDraft((current) => ({ ...current, subject: template.subject, bodyHtml: template.bodyHtml, updatedAt: new Date().toISOString() }));
+    resetSendGuards();
+  }
+
+  async function saveTemplate(name: string, description: string) {
+    setTemplatesError(null);
+    const response = await fetch('/api/templates', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name, description, subject: draft.subject, bodyHtml: draft.bodyHtml }),
+    });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(payload?.error ?? 'Failed to save template');
+    const template = payload?.data as EmailTemplateRecord | undefined;
+    if (!template) throw new Error('Template save returned no record');
+    setTemplates((current) => [template, ...current.filter((item) => item.id !== template.id)]);
+  }
+
   function addRow() {
     setRows((current) => [...current, { id: newId('row'), contactId: '', email: '', language: 'en', salutation: '' }]);
     resetSendGuards();
@@ -451,7 +498,7 @@ export function OutreachApp() {
           <section className="tabPane composeGrid">
             <div className="composeLeft">
               <SenderSettings senders={senders} selectedSenderId={selectedSenderId} replyToEmail={replyToEmail} loading={sendersLoading} error={sendersError} onSenderChange={updateSender} onReplyToEmailChange={(value) => { setReplyToEmail(value); resetSendGuards(); }} />
-              <CampaignBuilder campaignName={campaignName} draft={draft} onCampaignNameChange={(value) => { setCampaignName(value); resetSendGuards(); }} onDraftChange={updateDraft} />
+              <CampaignBuilder campaignName={campaignName} draft={draft} onCampaignNameChange={(value) => { setCampaignName(value); resetSendGuards(); }} onDraftChange={updateDraft} templates={templates} templatesLoading={templatesLoading} templatesError={templatesError} onApplyTemplate={applyTemplate} onSaveTemplate={saveTemplate} />
               <RecipientRows rows={rows} contacts={contacts} hasDuplicate={duplicateRecipients} onAddRow={addRow} onRemoveRow={removeRow} onUpdateRow={updateRow} />
             </div>
             <div className="composeRight">

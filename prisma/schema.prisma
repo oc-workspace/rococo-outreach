@@ -44,6 +44,21 @@ model EmailSender {
   @@map("email_senders")
 }
 
+model EmailTemplate {
+  id          String   @id @default(cuid())
+  name        String
+  description String   @default("")
+  subject     String
+  bodyHtml    String
+  status      String   @default("active")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([status])
+  @@index([updatedAt])
+  @@map("email_templates")
+}
+
 model EmailCampaign {
   id           String                  @id @default(cuid())
   idempotencyKey String?               @unique
