@@ -262,6 +262,12 @@ This version improves efficiency after the basic flow is usable:
 - Retry failed sends.
 - Attachment management.
 
+Current status as of 2026-08-11: contact search/filtering/tags, bulk contact
+selection, reusable-template save/apply, all listed token replacements (plus
+`displayName` and `email`), and manual retry for failed deliveries are deployed.
+Template edit/archive UI, template language/version metadata, attachments, and
+campaign duplication are not complete.
+
 ### Version 3
 
 This version adds operational and growth controls:
@@ -278,33 +284,45 @@ This version adds operational and growth controls:
 
 ### Slice 1: Frontend Safe MVP
 
-Current deployed slice: a usable frontend workflow prototype with explicit safety states.
+Completed foundation: a usable frontend workflow with explicit safety states.
 
-- Contacts, campaign draft, recipient rows, preview, and history are modeled in frontend state.
-- Send behavior is simulated but follows the one-recipient-per-send rule.
+- Campaign draft and recipient-row editing remain frontend state, while contacts,
+  templates, send history, campaigns, and deliveries are API/database-backed.
+- Real Campaign sending uses the protected backend SMTP path and follows the
+  one-recipient-per-send rule. A development-only failure simulator remains for
+  safe partial-failure testing.
 - Preview, test-send, second confirmation, duplicate checks, blocked-contact warnings, and per-recipient warnings are already represented in the UI model.
-- This slice validates the user workflow and UI state model before persistence and provider integration.
+- The workflow, persistence, and provider path have all passed controlled
+  end-to-end checks.
 
 ### Slice 2: PostgreSQL Persistence
 
-Next architecture slice: move from local frontend state to persistent API-backed data.
+Mostly completed architecture slice: move durable product records from local
+frontend state to persistent API-backed data.
 
-- Add Prisma and PostgreSQL schema.
-- Add models for `EmailContact`, `EmailDraft`, `EmailCampaign`, and `EmailCampaignRecipient`.
-- Add Contacts CRUD API.
-- Persist Draft / Campaign / Recipient records.
-- Move frontend data flow from local state to API-backed loading, saving, empty, error, and success states.
-- Read History from the database.
-- Keep preview, test-send, second confirmation, and one-by-one send safety gates unchanged.
+- Prisma/PostgreSQL models and APIs exist for contacts, senders, templates,
+  campaigns, deliveries, and retry requests.
+- Contacts CRUD/import, template save/apply, Campaign History, and delivery status
+  are database-backed.
+- Campaigns and recipient deliveries are persisted before sending.
+- Draft persistence is the main remaining gap in this slice; the current Compose
+  draft is still browser state and is lost on reload.
+- Preview, test-send, second confirmation, one-by-one sending, idempotency, and
+  manual retry safety gates remain in place.
 
 ### Slice 3: Real Sending Provider
 
-After persistence is stable, connect real delivery.
+Completed for the current single development mailbox, with operational limits:
 
-- Add Resend or SMTP provider integration.
-- Keep one independent send call per recipient.
-- Store provider message IDs and provider errors on recipient records.
-- Do not enable large-volume sending until rate limits and operational safeguards exist.
+- Tencent enterprise mail SMTP on port 465 is the verified delivery path.
+- The selected sender must exactly match the configured SMTP mailbox, and each
+  recipient is sent independently.
+- Provider message IDs and safe provider errors are stored on delivery records.
+- Controlled test and Campaign sends verified `From`, `Reply-To`, recipient
+  delivery, and Tencent Sent-folder visibility.
+- Large-volume sending remains out of scope until application-wide access
+  control, pacing/rate limits, a durable queue, stop controls, and auditability
+  are implemented.
 
 ## 10. Recommended Implementation Phases
 
@@ -315,7 +333,7 @@ After persistence is stable, connect real delivery.
 - Recipient row UI.
 - Per-recipient preview.
 - Test send.
-- One-by-one sending through Resend.
+- One-by-one sending through the configured Tencent enterprise mailbox SMTP.
 - Campaign and recipient status records.
 
 ### Phase 2: Efficiency
@@ -344,19 +362,23 @@ After persistence is stable, connect real delivery.
 
 ## 11. Sending Provider Recommendation
 
-Use Resend for the first version.
+Use the verified Tencent enterprise mailbox SMTP account on port 465 for the
+current internal development version. Keep the transport interface
+provider-neutral so a verified-domain provider such as Resend can be added later
+if the product no longer requires messages to appear in the employee mailbox
+Sent folder.
 
 Sending rule:
 
 ```ts
-for (const recipient of recipients) {
-  await resend.emails.send({
-    from: 'Rococo <noreply@rococo.dev>',
-    to: [recipient.email],
-    subject: recipient.renderedSubject,
-    html: recipient.renderedBodyHtml,
-    text: recipient.renderedBodyText,
-    attachments: recipient.attachments,
+for (const delivery of deliveries) {
+  await transport.send({
+    from: configuredMailbox,
+    replyTo: configuredMailbox,
+    to: delivery.email,
+    subject: delivery.renderedSubject,
+    html: delivery.renderedBodyHtml,
+    text: delivery.renderedBodyText,
   })
 }
 ```

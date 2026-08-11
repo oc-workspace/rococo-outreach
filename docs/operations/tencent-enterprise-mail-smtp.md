@@ -5,7 +5,7 @@
 - Provider: Tencent enterprise mail / Enterprise WeChat mail
 - SMTP host: `smtp.exmail.qq.com`
 - Client services visible in the mailbox UI: `IMAP/SMTP`, `POP/SMTP`
-- Sent folder requirement: required before mailbox-backed sending is complete
+- Sent folder requirement: verified for the current development mailbox on 2026-08-09
 - Secrets must be supplied through server-side environment or secret storage
 
 ## Connectivity Snapshot
@@ -43,19 +43,22 @@ test API must remain unavailable unless its server-only bearer token is set.
 
 ## Sent Folder Verification
 
-SMTP connectivity and authentication do not prove that Tencent will place a
-message in the employee mailbox Sent folder. Run one controlled test only after
-the test endpoint is protected, then record:
+SMTP connectivity and authentication alone do not prove that Tencent places a
+message in the employee mailbox Sent folder. The protected endpoint and current
+development mailbox completed the required controlled verification on
+2026-08-09:
 
 ```text
-Test sender: recorded outside source control
+Test sender: winnie@next2p.com
 Test recipient: recorded outside source control
-Sent at:
-Recipient saw the expected From address: yes/no
-Reply target was the expected employee mailbox: yes/no
-Message appeared in the employee mailbox Sent folder: yes/no
-Provider message id:
+Recipient received the message: yes
+Recipient saw the expected From address: yes
+Reply target was the expected employee mailbox: yes
+Message appeared in the employee mailbox Sent folder: yes
+Provider message id: persisted in the database; intentionally omitted here
 ```
 
-If the Sent folder result is no, do not mark the feature complete. Investigate
-IMAP append-to-sent or a Tencent mailbox API before implementing general sending.
+The first controlled Campaign send passed the same recipient, `From`,
+`Reply-To`, and Sent-folder acceptance checks. IMAP append-to-sent or a Tencent
+mailbox API is therefore not required for the current mailbox. Re-run this
+verification before approving a different mailbox or transport configuration.

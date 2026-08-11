@@ -47,7 +47,7 @@ PostgreSQL email_senders
   -> GET /api/senders
   -> OutreachApp sender state
   -> SenderSettings select
-  -> Preview / test send / real send simulation / campaign history
+  -> Preview / protected test send / protected Campaign send / persisted history
 ```
 
 Current API contract:
@@ -84,7 +84,7 @@ Implemented frontend boundaries:
 ## Completed
 
 - [x] Added visible `Sender settings` to the Compose flow.
-- [x] Added `Sender name`, `Sender email`, and `Reply-to email` into preview, test send, real send simulation, and campaign history state.
+- [x] Added `Sender name`, `Sender email`, and `Reply-to email` into preview, test send, protected Campaign sending, and campaign history state.
 - [x] Added validation for sender name, sender email, reply-to email, domain verification, sender verification, and active sender status.
 - [x] Added loading, empty, error, disabled, verified, and not verified UI states for senders.
 - [x] Stabilized the `/api/senders` response shape with `createdAt` and `updatedAt`.
@@ -103,6 +103,13 @@ Implemented frontend boundaries:
 - [x] Verified that port 587 is network/STARTTLS reachable, while recording that Nodemailer authentication is not yet stable on that port.
 - [x] Added a non-sending SMTP `verify()` operation and enforced safe 465/587 TLS configuration pairs.
 - [x] Protected the development SMTP test endpoint with a server-side bearer token, masked addresses, sanitized errors, private/no-store responses, and per-process rate limits.
+- [x] Added a protected campaign-send API backed by Tencent enterprise mail SMTP.
+- [x] Enforced active/verified sender eligibility, exact equality with the configured SMTP mailbox, and matching Reply-To at the campaign-send API layer.
+- [x] Persisted campaign and per-recipient delivery records before sending, including provider message IDs, safe errors, attempt counts, and timestamps.
+- [x] Connected the frontend Campaign send action and Campaign History to the protected persistent APIs.
+- [x] Added idempotency protection for sends and explicit idempotent retry for failed deliveries.
+- [x] Completed controlled port 465 test and Campaign sends and verified recipient delivery, `From`, `Reply-To`, and Tencent Sent-folder visibility.
+- [x] Verified partial-failure persistence and manual retry without duplicate delivery attempts by using the development-only simulated-failure path.
 
 ## Not Done Yet
 
@@ -113,12 +120,9 @@ Implemented frontend boundaries:
 - [ ] Add write APIs for sender management, if the product wants sender management inside this app.
 - [ ] Add workspace/team ownership and permissions for sender records.
 - [ ] Add a real domain and sender verification workflow, including provider/DNS status if needed.
-- [ ] Replace the frontend mock campaign send with the real backend SMTP transport. The current real SMTP path is limited to the protected development test endpoint.
-- [ ] Enforce allowed sender eligibility again at the real send API layer when provider sending is connected.
-- [ ] Bind each allowed `EmailSender` to the exact authenticated mailbox account and reject sender/mailbox mismatches.
-- [ ] Run one controlled port 465 test send and verify `From`, `Reply-To`, and Tencent Sent-folder visibility.
-- [ ] Add IMAP append or a mailbox API only if Tencent SMTP does not populate the Sent folder.
-- [ ] Persist campaign records and delivery records in the database. Current send/campaign history is still simulated in frontend state.
+- [ ] Replace the current single SMTP mailbox environment configuration with a persistent mailbox-account authorization model before supporting multiple mailbox-backed senders.
+- [ ] Add application-wide authentication and authorization for contact, template, campaign-history, and sender data. The send and retry endpoints already have a development bearer-token gate, but the rest of the internal tool is not yet protected at the application layer.
+- [ ] Add campaign pacing, a durable send queue, and a way to stop deliveries that have not started before increasing send volume.
 - [ ] Add browser-level interaction tests for sender selection and invalid sender recovery.
 
 ## Risks / Tradeoffs
@@ -129,7 +133,7 @@ Free text sender input is flexible, but it makes invalid or spoofed sender addre
 
 ## Current Verification Snapshot
 
-Verified on `netcup2` on 2026-08-07:
+Verified on `netcup2` through 2026-08-11:
 
 - `https://outreach-dev.rococo.dev` returns `200 OK`.
 - `GET /api/senders` returns two database-backed sender records.
@@ -138,8 +142,10 @@ Verified on `netcup2` on 2026-08-07:
 - Nodemailer authentication succeeds on 465 with `secure=true`.
 - Nodemailer verification on 587 times out and is not approved for application use yet.
 - The protected endpoint passes unauthenticated, authenticated/masked, non-sending verification, and disabled-by-default integration checks.
+- The protected Campaign endpoint sends through the exact configured Tencent mailbox, persists Campaign and Delivery records, and rejects unauthenticated requests.
+- One controlled test send and one controlled Campaign send passed recipient delivery, `From`, `Reply-To`, and Sent-folder checks.
+- Idempotent send, idempotent manual retry, and partial-failure recovery checks passed without duplicate sends.
 - `yarn build` passes.
-- A real test email and Sent-folder verification have not been performed in this slice.
 
 ## Open Questions
 
