@@ -135,11 +135,15 @@ Free text sender input is flexible, but it makes invalid or spoofed sender addre
 
 ## Current Verification Snapshot
 
-Verified on `netcup2` through 2026-08-11:
+Verified on `netcup2` through the application-access deployment on 2026-08-11:
 
-- `https://outreach-dev.rococo.dev` returns `200 OK`.
-- `GET /api/senders` returns two database-backed sender records.
-- `GET /api/contacts` returns contact data.
+- `GET /login` returns `200`; unauthenticated application pages redirect to the
+  login page.
+- Unauthenticated contact, template, sender, and Campaign API requests return
+  `401`; authenticated browser sessions can read the existing database-backed
+  records.
+- The authenticated database snapshot remains 19 contacts and one active
+  template; all 13 `japan-media` contacts remain `inactive`.
 - Both 465 implicit TLS and 587 STARTTLS pass TCP/TLS certificate checks from the application container.
 - Nodemailer authentication succeeds on 465 with `secure=true`.
 - Nodemailer verification on 587 times out and is not approved for application use yet.
