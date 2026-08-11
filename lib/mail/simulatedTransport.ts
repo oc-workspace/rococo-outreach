@@ -50,3 +50,7 @@ export function createSimulatedMailTransport(failureRecipient?: string): MailTra
     },
   };
 }
+
+export function isSimulatedMailTransportRequired(): boolean {
+  return process.env.OUTREACH_MAIL_TRANSPORT === 'simulated';
+}

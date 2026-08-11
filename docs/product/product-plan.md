@@ -294,6 +294,8 @@ Completed foundation: a usable frontend workflow with explicit safety states.
 - Preview, test-send, second confirmation, duplicate checks, blocked-contact warnings, and per-recipient warnings are already represented in the UI model.
 - The workflow, persistence, and provider path have all passed controlled
   end-to-end checks.
+- The critical browser workflows now have an isolated Playwright baseline backed
+  by a temporary PostgreSQL database and simulated Campaign transport.
 
 ### Slice 2: PostgreSQL Persistence
 
@@ -320,9 +322,8 @@ Completed for the current single development mailbox, with operational limits:
 - Provider message IDs and safe provider errors are stored on delivery records.
 - Controlled test and Campaign sends verified `From`, `Reply-To`, recipient
   delivery, and Tencent Sent-folder visibility.
-- Large-volume sending remains out of scope until application-wide access
-  control, pacing/rate limits, a durable queue, stop controls, and auditability
-  are implemented.
+- Large-volume sending remains out of scope until pacing/rate limits, a durable
+  queue, stop controls, and auditability are implemented.
 
 ## 10. Recommended Implementation Phases
 

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createSimulatedMailTransport, readSimulationFailureRecipient, SimulationInputError } from '@/lib/mail/simulatedTransport';
+import { createSimulatedMailTransport, isSimulatedMailTransportRequired, readSimulationFailureRecipient, SimulationInputError } from '@/lib/mail/simulatedTransport';
 import { authorizeDevOutreachToken } from '@/lib/outreach/apiAuth';
 import { toCampaignRecord } from '@/lib/outreach/campaigns';
 import { isValidIdempotencyKey, retryFailedCampaign } from '@/lib/outreach/sendCampaign';
@@ -18,7 +18,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
     const campaign = await retryFailedCampaign(
       params.id,
       idempotencyKey,
-      simulationFailureRecipient ? { transport: createSimulatedMailTransport() } : undefined,
+      simulationFailureRecipient || isSimulatedMailTransportRequired()
+        ? { transport: createSimulatedMailTransport() }
+        : undefined,
     );
     return privateJson({ data: toCampaignRecord(campaign) });
   } catch (error) {

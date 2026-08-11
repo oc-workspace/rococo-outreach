@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createSimulatedMailTransport, readSimulationFailureRecipient, SimulationInputError } from '@/lib/mail/simulatedTransport';
+import { createSimulatedMailTransport, isSimulatedMailTransportRequired, readSimulationFailureRecipient, SimulationInputError } from '@/lib/mail/simulatedTransport';
 import { authorizeDevOutreachToken } from '@/lib/outreach/apiAuth';
 import { toCampaignRecord } from '@/lib/outreach/campaigns';
 import { CampaignSendError, isValidIdempotencyKey, sendAndPersistCampaign, type SendCampaignInput } from '@/lib/outreach/sendCampaign';
@@ -21,7 +21,9 @@ export async function POST(request: Request) {
     const campaign = await sendAndPersistCampaign(
       payload as SendCampaignInput,
       idempotencyKey,
-      simulationFailureRecipient ? { transport: createSimulatedMailTransport(simulationFailureRecipient) } : undefined,
+      simulationFailureRecipient || isSimulatedMailTransportRequired()
+        ? { transport: createSimulatedMailTransport(simulationFailureRecipient) }
+        : undefined,
     );
     return privateJson({ data: toCampaignRecord(campaign) });
   } catch (error) {

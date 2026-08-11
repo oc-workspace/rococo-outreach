@@ -32,12 +32,12 @@ export function SenderSettings({ senders, selectedSenderId, replyToEmail, loadin
         {error && <div className="warning">{error}</div>}
         {!loading && !error && senders.length === 0 && <div className="empty">No verified senders available.</div>}
         <div className="field">
-          <label>Sender shown to recipients</label>
-          <select className="select" value={selectedSenderId} onChange={(event) => onSenderChange(event.target.value)} disabled={loading || senders.length === 0}>
+          <label htmlFor="outreach-sender">Sender shown to recipients</label>
+          <select id="outreach-sender" className="select" value={selectedSenderId} onChange={(event) => onSenderChange(event.target.value)} disabled={loading || senders.length === 0}>
             {senders.map((sender) => <option key={sender.id} value={sender.id}>{senderLabel(sender)}</option>)}
           </select>
         </div>
-        <div className="field"><label>Reply-to email</label><input className="input" disabled={loading || senders.length === 0} value={replyToEmail} onChange={(event) => onReplyToEmailChange(event.target.value)} /></div>
+        <div className="field"><label htmlFor="outreach-reply-to">Reply-to email</label><input id="outreach-reply-to" className="input" disabled={loading || senders.length === 0} value={replyToEmail} onChange={(event) => onReplyToEmailChange(event.target.value)} /></div>
         {selectedSender && <div className="senderHint">Domain {selectedSender.domain}: {selectedSender.domainVerified ? 'verified' : 'not verified'} · Sender: {selectedSender.senderVerified ? 'verified' : 'not verified'}</div>}
       </div>
     </section>

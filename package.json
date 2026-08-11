@@ -7,6 +7,8 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "test": "node --import tsx --test tests/*.test.ts",
+    "test:e2e": "bash scripts/run-e2e.sh",
+    "test:e2e:headed": "bash scripts/run-e2e.sh --headed",
     "lint": "next lint",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
@@ -27,6 +29,7 @@
     "typescript": "5.4.2"
   },
   "devDependencies": {
+    "@playwright/test": "1.55.0",
     "@types/nodemailer": "^8.0.1",
     "@types/sanitize-html": "^2.16.1",
     "eslint": "8.57.0",

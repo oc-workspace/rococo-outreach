@@ -112,6 +112,7 @@ Implemented frontend boundaries:
 - [x] Verified partial-failure persistence and manual retry without duplicate delivery attempts by using the development-only simulated-failure path.
 - [x] Added application-wide operator authentication for pages and all contact, CSV import, sender, template, campaign-history, send, and retry APIs using a signed browser session while retaining Bearer-token compatibility for operational scripts.
 - [x] Added server-side HTML allowlist sanitization at template storage/read, Campaign storage/read, preview rendering, and final-send boundaries; plain-text delivery content is regenerated from the sanitized HTML.
+- [x] Added isolated Playwright coverage for sender selection, invalid-selection recovery after reload, template persistence, contact workflows, and protected Campaign sending/retry with a simulated mail transport.
 
 ## Not Done Yet
 
@@ -125,7 +126,6 @@ Implemented frontend boundaries:
 - [ ] Replace the current single SMTP mailbox environment configuration with a persistent mailbox-account authorization model before supporting multiple mailbox-backed senders.
 - [ ] Replace the current shared operator credential with workspace/team identities and role-based authorization before the internal tool needs multiple access levels.
 - [ ] Add campaign pacing, a durable send queue, and a way to stop deliveries that have not started before increasing send volume.
-- [ ] Add browser-level interaction tests for sender selection and invalid sender recovery.
 
 ## Risks / Tradeoffs
 
