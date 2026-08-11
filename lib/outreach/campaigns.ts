@@ -1,4 +1,5 @@
 import type { CampaignRecord, DeliveryRecord } from './types';
+import { sanitizeEmailHtml } from './htmlSafety';
 
 type DeliveryRecordRow = {
   id: string;
@@ -49,7 +50,7 @@ export function toCampaignRecord(row: CampaignRecordRow): CampaignRecord {
     id: row.id,
     name: row.name,
     subject: row.subject,
-    bodyHtml: row.bodyHtml,
+    bodyHtml: sanitizeEmailHtml(row.bodyHtml),
     senderEmail: row.senderEmail,
     senderName: row.senderName,
     replyToEmail: row.replyToEmail,
@@ -67,7 +68,7 @@ export function toCampaignRecord(row: CampaignRecordRow): CampaignRecord {
       to: delivery.toEmail,
       subject: delivery.renderedSubject,
       salutation: delivery.salutation,
-      bodyHtml: delivery.renderedBodyHtml,
+      bodyHtml: sanitizeEmailHtml(delivery.renderedBodyHtml),
       bodyText: delivery.renderedBodyText,
       warnings: [],
       sendStatus: toDeliveryStatus(delivery.sendStatus),

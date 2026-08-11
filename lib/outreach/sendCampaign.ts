@@ -2,6 +2,8 @@ import { prisma } from '@/lib/db/prisma';
 import { createTencentEnterpriseMailTransport, readTencentEnterpriseMailConfig } from '@/lib/mail/transportFactory';
 import type { MailTransport } from '@/lib/mail/transport';
 import type { RenderedEmail } from './types';
+import { htmlToText } from './render';
+import { sanitizeEmailHtml } from './htmlSafety';
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const maxRecipients = 50;
@@ -64,7 +66,7 @@ export async function sendAndPersistCampaign(input: SendCampaignInput, idempoten
 
   const name = input.name.trim();
   const subject = input.subject.trim();
-  const bodyHtml = input.bodyHtml.trim();
+  const bodyHtml = sanitizeEmailHtml(input.bodyHtml);
   const senderName = input.senderName.trim();
   const replyToEmail = input.replyToEmail.trim().toLowerCase();
   if (!name || !subject || !bodyHtml || !senderName) throw new CampaignSendError(400, 'Campaign name, subject, body, and sender name are required');
@@ -76,8 +78,8 @@ export async function sendAndPersistCampaign(input: SendCampaignInput, idempoten
   const normalizedDeliveries = input.deliveries.map((delivery, index) => {
     const toEmail = String(delivery.to || '').trim().toLowerCase();
     const renderedSubject = String(delivery.subject || '').trim();
-    const renderedBodyHtml = String(delivery.bodyHtml || '').trim();
-    const renderedBodyText = String(delivery.bodyText || '').trim();
+    const renderedBodyHtml = sanitizeEmailHtml(String(delivery.bodyHtml || ''));
+    const renderedBodyText = htmlToText(renderedBodyHtml);
     const salutation = String(delivery.salutation || '').trim();
     if (!emailPattern.test(toEmail)) throw new CampaignSendError(400, `Delivery ${index + 1} has an invalid recipient email`);
     if (!renderedSubject || !renderedBodyHtml || !renderedBodyText) throw new CampaignSendError(400, `Delivery ${index + 1} is missing rendered content`);

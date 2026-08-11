@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
+    "test": "node --import tsx --test tests/*.test.ts",
     "lint": "next lint",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
@@ -22,12 +23,15 @@
     "nodemailer": "^9.0.3",
     "react": "18.2.0",
     "react-dom": "18.2.0",
+    "sanitize-html": "2.16.0",
     "typescript": "5.4.2"
   },
   "devDependencies": {
     "@types/nodemailer": "^8.0.1",
+    "@types/sanitize-html": "^2.16.1",
     "eslint": "8.57.0",
     "eslint-config-next": "14.2.23",
-    "prisma": "6.19.0"
+    "prisma": "6.19.0",
+    "tsx": "^4.23.12"
   }
 }

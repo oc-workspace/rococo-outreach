@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import type { EmailTemplateRecord } from '@/lib/outreach/types';
+import { sanitizeEmailHtml } from '@/lib/outreach/htmlSafety';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,6 +21,7 @@ function toTemplate(template: {
 }): EmailTemplateRecord {
   return {
     ...template,
+    bodyHtml: sanitizeEmailHtml(template.bodyHtml),
     createdAt: template.createdAt.toISOString(),
     updatedAt: template.updatedAt.toISOString(),
   };
@@ -29,7 +31,10 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   const body = await request.json().catch(() => ({}));
   const data: Record<string, string> = {};
   for (const field of ['name', 'description', 'subject', 'bodyHtml'] as const) {
-    if (field in body && typeof body[field] === 'string') data[field] = text(body[field]);
+    if (field in body && typeof body[field] === 'string') {
+      const value = text(body[field]);
+      data[field] = field === 'bodyHtml' ? sanitizeEmailHtml(value) : value;
+    }
   }
   if (body.status === 'active' || body.status === 'archived') data.status = body.status;
   if ('name' in data && !data.name || 'subject' in data && !data.subject || 'bodyHtml' in data && !data.bodyHtml) {

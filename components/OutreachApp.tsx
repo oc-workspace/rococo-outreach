@@ -7,6 +7,7 @@ import { HistoryPanel } from './HistoryPanel';
 import { PreviewPanel } from './PreviewPanel';
 import { RecipientRows } from './RecipientRows';
 import { SenderSettings } from './SenderSettings';
+import { LogoutButton } from './LogoutButton';
 import { initialDraft, initialRecipients } from '@/lib/outreach/seed';
 import { hasDuplicateRecipients, renderRecipientEmail } from '@/lib/outreach/render';
 import { validateCampaignSend } from '@/lib/outreach/validation';
@@ -56,7 +57,6 @@ export function OutreachApp() {
   const [templates, setTemplates] = useState<EmailTemplateRecord[]>([]);
   const [templatesLoading, setTemplatesLoading] = useState(true);
   const [templatesError, setTemplatesError] = useState<string | null>(null);
-  const [campaignSendToken, setCampaignSendToken] = useState('');
   const [campaignSending, setCampaignSending] = useState(false);
   const [campaignIdempotencyKey, setCampaignIdempotencyKey] = useState('');
   const [retryingCampaignId, setRetryingCampaignId] = useState<string | null>(null);
@@ -369,7 +369,6 @@ export function OutreachApp() {
 
   async function realSend() {
     const errors = getSendValidationErrors('real');
-    if (!campaignSendToken.trim()) errors.push({ section: 'Operator access', message: 'Operator token is required for the protected campaign send endpoint.' });
     setValidationErrors(errors);
     if (errors.length > 0) return;
 
@@ -379,7 +378,6 @@ export function OutreachApp() {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
-          authorization: `Bearer ${campaignSendToken.trim()}`,
           'idempotency-key': campaignIdempotencyKey || crypto.randomUUID(),
         },
         body: JSON.stringify({
@@ -409,17 +407,12 @@ export function OutreachApp() {
   }
 
   async function retryFailedCampaign(campaignId: string) {
-    if (!campaignSendToken.trim()) {
-      setCampaignsError('Operator token is required to retry failed recipients. Enter it in Compose first.');
-      return;
-    }
     setRetryingCampaignId(campaignId);
     setCampaignsError(null);
     try {
       const response = await fetch(`/api/campaigns/${campaignId}/retry-failed`, {
         method: 'POST',
         headers: {
-          authorization: `Bearer ${campaignSendToken.trim()}`,
           'idempotency-key': crypto.randomUUID(),
         },
       });
@@ -461,6 +454,7 @@ export function OutreachApp() {
             <span className="pill pillStrong">{rows.length} recipients</span>
             <span className="pill pillStrong">{sendersLoading ? 'loading senders' : `${senders.length} senders`}</span>
             <span className="pill">one-by-one send only</span>
+            <LogoutButton />
             {contactsError && <span className="pill statusBlocked">{contactsError}</span>}
             {sendersError && <span className="pill statusBlocked">{sendersError}</span>}
           </div>
@@ -502,7 +496,7 @@ export function OutreachApp() {
               <RecipientRows rows={rows} contacts={contacts} hasDuplicate={duplicateRecipients} onAddRow={addRow} onRemoveRow={removeRow} onUpdateRow={updateRow} />
             </div>
             <div className="composeRight">
-              <PreviewPanel renderedEmails={renderedEmails} previewed={previewed} testSent={testSent} confirmArmed={confirmArmed} validationErrors={validationErrors} testRecipientEmail={testRecipientEmail} senderName={senderName} senderEmail={senderEmail} replyToEmail={replyToEmail} campaignSendToken={campaignSendToken} campaignSending={campaignSending} onTestRecipientEmailChange={(value) => { setTestRecipientEmail(value); setValidationErrors([]); setTestSent(false); }} onCampaignSendTokenChange={(value) => { setCampaignSendToken(value); setValidationErrors([]); }} onPreview={previewCampaign} onTestSend={testSend} onArmConfirm={armConfirm} onRealSend={realSend} />
+              <PreviewPanel renderedEmails={renderedEmails} previewed={previewed} testSent={testSent} confirmArmed={confirmArmed} validationErrors={validationErrors} testRecipientEmail={testRecipientEmail} senderName={senderName} senderEmail={senderEmail} replyToEmail={replyToEmail} campaignSending={campaignSending} onTestRecipientEmailChange={(value) => { setTestRecipientEmail(value); setValidationErrors([]); setTestSent(false); }} onPreview={previewCampaign} onTestSend={testSend} onArmConfirm={armConfirm} onRealSend={realSend} />
             </div>
           </section>
         )}

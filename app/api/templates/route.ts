@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import type { EmailTemplateRecord } from '@/lib/outreach/types';
+import { sanitizeEmailHtml } from '@/lib/outreach/htmlSafety';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,6 +21,7 @@ function toTemplate(template: {
 }): EmailTemplateRecord {
   return {
     ...template,
+    bodyHtml: sanitizeEmailHtml(template.bodyHtml),
     createdAt: template.createdAt.toISOString(),
     updatedAt: template.updatedAt.toISOString(),
   };
@@ -30,7 +32,7 @@ function templateData(body: Record<string, unknown>) {
     name: text(body.name),
     description: text(body.description),
     subject: text(body.subject),
-    bodyHtml: text(body.bodyHtml),
+    bodyHtml: sanitizeEmailHtml(text(body.bodyHtml)),
     status: body.status === 'archived' ? 'archived' : 'active',
   };
 }

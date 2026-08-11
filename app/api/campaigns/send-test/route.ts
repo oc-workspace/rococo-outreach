@@ -1,6 +1,6 @@
-import { createHash, timingSafeEqual } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { createTencentEnterpriseMailTransport, readTencentEnterpriseMailConfig } from '@/lib/mail/transportFactory';
+import { authorizeDevOutreachToken } from '@/lib/outreach/apiAuth';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,7 +12,7 @@ const nextAllowedAt: Record<LimitedOperation, number> = {
 };
 
 export async function GET(request: Request) {
-  const accessFailure = authorizeTestEndpoint(request);
+  const accessFailure = await authorizeDevOutreachToken(request);
   if (accessFailure) return accessFailure;
 
   const readiness = readReadiness();
@@ -29,7 +29,7 @@ export async function GET(request: Request) {
 }
 
 export async function PUT(request: Request) {
-  const accessFailure = authorizeTestEndpoint(request);
+  const accessFailure = await authorizeDevOutreachToken(request);
   if (accessFailure) return accessFailure;
 
   const rateLimitFailure = reserveOperationSlot('verify');
@@ -58,7 +58,7 @@ export async function PUT(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const accessFailure = authorizeTestEndpoint(request);
+  const accessFailure = await authorizeDevOutreachToken(request);
   if (accessFailure) return accessFailure;
 
   const rateLimitFailure = reserveOperationSlot('send');
@@ -103,10 +103,6 @@ export async function POST(request: Request) {
   }
 }
 
-function isDevOutreachEnvironment(): boolean {
-  return process.env.NEXT_PUBLIC_OUTREACH_ENV === 'dev';
-}
-
 function readReadiness() {
   const required = [
     'TENCENT_MAIL_SMTP_USER',
@@ -132,27 +128,6 @@ function readReadiness() {
     missing,
     configurationValid,
   };
-}
-
-function authorizeTestEndpoint(request: Request): NextResponse | null {
-  if (!isDevOutreachEnvironment()) return privateJson({ error: 'Not found' }, { status: 404 });
-
-  const expectedToken = process.env.SMTP_TEST_API_TOKEN?.trim();
-  if (!expectedToken) return privateJson({ error: 'Not found' }, { status: 404 });
-
-  const authorization = request.headers.get('authorization');
-  const providedToken = authorization?.startsWith('Bearer ') ? authorization.slice(7).trim() : '';
-  if (!providedToken || !tokensMatch(expectedToken, providedToken)) {
-    return privateJson({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  return null;
-}
-
-function tokensMatch(expected: string, provided: string): boolean {
-  const expectedDigest = createHash('sha256').update(expected).digest();
-  const providedDigest = createHash('sha256').update(provided).digest();
-  return timingSafeEqual(expectedDigest, providedDigest);
 }
 
 function reserveOperationSlot(operation: LimitedOperation): NextResponse | null {

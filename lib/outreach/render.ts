@@ -1,4 +1,5 @@
 import type { EmailContact, EmailDraft, RecipientRow, RenderedEmail } from './types';
+import { sanitizeEmailHtml } from './htmlSafety';
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -36,7 +37,7 @@ export function renderRecipientEmail(draft: EmailDraft, row: RecipientRow, conta
   if (contact?.status === 'blocked') warnings.push('Contact is blocked.');
   if (contact?.status === 'inactive') warnings.push('Contact is inactive.');
   const subject = replaceTokens(draft.subject, contact, row);
-  const bodyHtml = replaceTokens(draft.bodyHtml, contact, row);
+  const bodyHtml = sanitizeEmailHtml(replaceTokens(draft.bodyHtml, contact, row));
   return { rowId: row.id, contactId: contact?.id, to: row.email, subject, salutation: row.salutation, bodyHtml, bodyText: htmlToText(bodyHtml), warnings };
 }
 

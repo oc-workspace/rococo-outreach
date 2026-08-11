@@ -100,13 +100,34 @@ instead of `eth0`. After changing these rules, verify `systemctl is-active
 sing-box`, `ip rule show`, direct HTTPS, and HTTPS through the operator's normal
 proxy/TUN path.
 
+## Internal application access
+
+The development application is disabled unless both
+`NEXT_PUBLIC_OUTREACH_ENV=dev` and `SMTP_TEST_API_TOKEN` are configured. The
+token is the current shared operator credential: configure it only in the
+server environment and never put its value in source control, documentation,
+browser code, or command history.
+
+Open `/login` and enter the operator token interactively. A successful login
+creates a signed 12-hour `HttpOnly`, `Secure`, `SameSite=Strict` session cookie.
+The application does not store the raw token in browser storage. Sign out from
+the application header when the session is no longer needed.
+
+All application pages and APIs, including contacts, CSV import, senders,
+templates, campaigns, deliveries, and retries, require this session. An
+unauthenticated page request is redirected to `/login`; an unauthenticated API
+request returns `401`. If the environment or token is missing, APIs return
+`404` and login remains unavailable.
+
+Operational scripts can continue to send
+`Authorization: Bearer <token>` instead of using a browser session. The Bearer
+token grants the same application access and must not be exposed to clients or
+logs.
+
 ## SMTP test endpoint
 
-The development-only SMTP diagnostic endpoint is disabled unless
-`SMTP_TEST_API_TOKEN` is configured. Keep this token server-side and never put
-it in browser code, source control, documentation, or command history.
-
-Authenticated operations are:
+The development-only SMTP diagnostic endpoint uses the same application
+session or Bearer token. Authenticated operations are:
 
 ```text
 GET  /api/campaigns/send-test  configuration readiness only
@@ -114,12 +135,11 @@ PUT  /api/campaigns/send-test  verify SMTP connection and authentication; does n
 POST /api/campaigns/send-test  send one email to the configured controlled recipient
 ```
 
-Send the token as `Authorization: Bearer <token>`. Responses mask mailbox
-addresses and do not return provider response text. Verification and test sends
-are rate limited in each application process. The default minimum intervals are
-10 seconds for verification and 60 seconds for test sends; override them with
-`SMTP_TEST_VERIFY_INTERVAL_SECONDS` and `SMTP_TEST_SEND_INTERVAL_SECONDS` only
-when operationally necessary.
+Responses mask mailbox addresses and do not return provider response text.
+Verification and test sends are rate limited in each application process. The
+default minimum intervals are 10 seconds for verification and 60 seconds for
+test sends; override them with `SMTP_TEST_VERIFY_INTERVAL_SECONDS` and
+`SMTP_TEST_SEND_INTERVAL_SECONDS` only when operationally necessary.
 
 For Tencent enterprise mail, the current verified application configuration is
 port 465 with implicit TLS (`TENCENT_MAIL_SMTP_SECURE=true`). Port 587 requires

@@ -110,6 +110,8 @@ Implemented frontend boundaries:
 - [x] Added idempotency protection for sends and explicit idempotent retry for failed deliveries.
 - [x] Completed controlled port 465 test and Campaign sends and verified recipient delivery, `From`, `Reply-To`, and Tencent Sent-folder visibility.
 - [x] Verified partial-failure persistence and manual retry without duplicate delivery attempts by using the development-only simulated-failure path.
+- [x] Added application-wide operator authentication for pages and all contact, CSV import, sender, template, campaign-history, send, and retry APIs using a signed browser session while retaining Bearer-token compatibility for operational scripts.
+- [x] Added server-side HTML allowlist sanitization at template storage/read, Campaign storage/read, preview rendering, and final-send boundaries; plain-text delivery content is regenerated from the sanitized HTML.
 
 ## Not Done Yet
 
@@ -121,7 +123,7 @@ Implemented frontend boundaries:
 - [ ] Add workspace/team ownership and permissions for sender records.
 - [ ] Add a real domain and sender verification workflow, including provider/DNS status if needed.
 - [ ] Replace the current single SMTP mailbox environment configuration with a persistent mailbox-account authorization model before supporting multiple mailbox-backed senders.
-- [ ] Add application-wide authentication and authorization for contact, template, campaign-history, and sender data. The send and retry endpoints already have a development bearer-token gate, but the rest of the internal tool is not yet protected at the application layer.
+- [ ] Replace the current shared operator credential with workspace/team identities and role-based authorization before the internal tool needs multiple access levels.
 - [ ] Add campaign pacing, a durable send queue, and a way to stop deliveries that have not started before increasing send volume.
 - [ ] Add browser-level interaction tests for sender selection and invalid sender recovery.
 

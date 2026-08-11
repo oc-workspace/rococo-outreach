@@ -7,7 +7,7 @@ import { CampaignSendError, isValidIdempotencyKey, sendAndPersistCampaign, type 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
-  const accessFailure = authorizeDevOutreachToken(request);
+  const accessFailure = await authorizeDevOutreachToken(request);
   if (accessFailure) return accessFailure;
 
   const idempotencyKey = request.headers.get('idempotency-key')?.trim() ?? '';
