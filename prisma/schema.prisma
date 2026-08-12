@@ -46,16 +46,24 @@ model EmailSender {
 
 model EmailTemplate {
   id          String   @id @default(cuid())
+  templateKey String   @default("")
+  version     Int      @default(1)
+  isCurrent   Boolean  @default(true)
   name        String
   description String   @default("")
   subject     String
   bodyHtml    String
+  language    String   @default("en")
+  purpose     String   @default("")
+  tags        String[] @default([])
   status      String   @default("active")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   @@index([status])
   @@index([updatedAt])
+  @@index([templateKey, isCurrent])
+  @@unique([templateKey, version])
   @@map("email_templates")
 }
 

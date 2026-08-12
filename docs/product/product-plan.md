@@ -262,11 +262,12 @@ This version improves efficiency after the basic flow is usable:
 - Retry failed sends.
 - Attachment management.
 
-Current status as of 2026-08-11: contact search/filtering/tags, bulk contact
-selection, reusable-template save/apply, all listed token replacements (plus
-`displayName` and `email`), and manual retry for failed deliveries are deployed.
-Template edit/archive UI, template language/version metadata, attachments, and
-campaign duplication are not complete.
+Current status as of 2026-08-12: contact search/filtering/tags, bulk contact
+selection, reusable-template save/apply/edit, archive/restore, language/purpose/
+tag metadata, version history and switching, all listed token replacements (plus
+`displayName` and `email`), and manual retry for failed deliveries are deployed
+in the current implementation branch. Attachments, campaign duplication, and
+database-backed campaign draft persistence remain incomplete.
 
 ### Version 3
 
@@ -304,8 +305,8 @@ frontend state to persistent API-backed data.
 
 - Prisma/PostgreSQL models and APIs exist for contacts, senders, templates,
   campaigns, deliveries, and retry requests.
-- Contacts CRUD/import, template save/apply, Campaign History, and delivery status
-  are database-backed.
+- Contacts CRUD/import, template save/apply/edit, archive/restore, versioned
+  metadata, Campaign History, and delivery status are database-backed.
 - Campaigns and recipient deliveries are persisted before sending.
 - Draft persistence is the main remaining gap in this slice; the current Compose
   draft is still browser state and is lost on reload.

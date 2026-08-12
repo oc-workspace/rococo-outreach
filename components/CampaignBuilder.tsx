@@ -11,12 +11,20 @@ interface Props {
   templatesLoading: boolean;
   templatesError: string | null;
   onApplyTemplate: (template: EmailTemplateRecord) => void;
-  onSaveTemplate: (name: string, description: string) => Promise<void>;
+  onSaveTemplate: (input: Partial<EmailTemplateRecord> & { name: string; description: string }) => Promise<void>;
+  onUpdateTemplate: (id: string, input: Partial<EmailTemplateRecord> & { createVersion?: boolean }) => Promise<EmailTemplateRecord>;
+  onArchiveTemplate: (template: EmailTemplateRecord) => Promise<void>;
+  onSwitchTemplateVersion: (template: EmailTemplateRecord, version: number) => Promise<void>;
 }
 
-export function CampaignBuilder({ campaignName, draft, onCampaignNameChange, onDraftChange, templates, templatesLoading, templatesError, onApplyTemplate, onSaveTemplate }: Props) {
+export function CampaignBuilder({ campaignName, draft, onCampaignNameChange, onDraftChange, templates, templatesLoading, templatesError, onApplyTemplate, onSaveTemplate, onUpdateTemplate, onArchiveTemplate, onSwitchTemplateVersion }: Props) {
   const [templateName, setTemplateName] = useState('');
   const [templateDescription, setTemplateDescription] = useState('');
+  const [templateLanguage, setTemplateLanguage] = useState('en');
+  const [templatePurpose, setTemplatePurpose] = useState('');
+  const [templateTags, setTemplateTags] = useState('');
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
+  const [versionHistory, setVersionHistory] = useState<Record<string, EmailTemplateRecord[]>>({});
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [templateMessage, setTemplateMessage] = useState<string | null>(null);
 
@@ -25,7 +33,7 @@ export function CampaignBuilder({ campaignName, draft, onCampaignNameChange, onD
     setSavingTemplate(true);
     setTemplateMessage(null);
     try {
-      await onSaveTemplate(templateName, templateDescription);
+      await onSaveTemplate({ name: templateName, description: templateDescription, language: templateLanguage, purpose: templatePurpose, tags: templateTags.split(',').map((tag) => tag.trim()).filter(Boolean) });
       setTemplateName('');
       setTemplateDescription('');
       setTemplateMessage('Template saved.');
@@ -60,11 +68,19 @@ export function CampaignBuilder({ campaignName, draft, onCampaignNameChange, onD
               {templates.map((template) => (
                 <div className="templateItem" key={template.id}>
                   <div className="templateItemText">
-                    <strong>{template.name}</strong>
+                    <strong>{template.name} · v{template.version}</strong>
                     {template.description && <span>{template.description}</span>}
-                    <small>{template.subject}</small>
+                    <small>{template.language} · {template.purpose || 'general'} · {template.status}</small>
                   </div>
-                  <button className="button buttonSmall" type="button" onClick={() => onApplyTemplate(template)}>Use</button>
+                  <div className="rowWrap">
+                    <button className="button buttonSmall" type="button" disabled={template.status !== 'active'} onClick={() => onApplyTemplate(template)}>Use</button>
+                    <button className="button buttonSmall" type="button" onClick={() => setEditingTemplateId(editingTemplateId === template.id ? null : template.id)}>{editingTemplateId === template.id ? 'Close' : 'Edit'}</button>
+                    <button className="button buttonSmall" type="button" onClick={() => onUpdateTemplate(template.id, { name: template.name, description: template.description, subject: template.subject, bodyHtml: template.bodyHtml, language: template.language, purpose: template.purpose, tags: template.tags, createVersion: true })}>New version</button>
+                    <button className="button buttonSmall" type="button" onClick={async () => { const response = await fetch(`/api/templates/${template.id}/versions`); const payload = await response.json(); setVersionHistory((current) => ({ ...current, [template.templateKey]: payload.data ?? [] })); }}>Versions</button>
+                    <button className="button buttonSmall" type="button" onClick={() => onArchiveTemplate(template)}>{template.status === 'archived' ? 'Restore' : 'Archive'}</button>
+                  </div>
+                  {editingTemplateId === template.id && <TemplateEditForm template={template} onSave={async (input) => { await onUpdateTemplate(template.id, input); setEditingTemplateId(null); }} />}
+                  {versionHistory[template.templateKey] && <div className="templateVersions">{versionHistory[template.templateKey].map((version) => <div className="rowWrap" key={version.id}><span className="pill">v{version.version}{version.isCurrent ? ' current' : ''}</span><span>{version.subject}</span>{!version.isCurrent && <button className="button buttonSmall" type="button" onClick={() => onSwitchTemplateVersion(template, version.version)}>Switch</button>}</div>)}</div>}
                 </div>
               ))}
             </div>
@@ -72,6 +88,9 @@ export function CampaignBuilder({ campaignName, draft, onCampaignNameChange, onD
           <div className="rowWrap">
             <div className="field"><label htmlFor="template-name">Template name</label><input id="template-name" className="input" value={templateName} onChange={(event) => setTemplateName(event.target.value)} placeholder="e.g. Japan media intro" /></div>
             <div className="field"><label htmlFor="template-description">Description (optional)</label><input id="template-description" className="input" value={templateDescription} onChange={(event) => setTemplateDescription(event.target.value)} placeholder="When to use this template" /></div>
+            <div className="field"><label htmlFor="template-language">Language</label><input id="template-language" className="input" value={templateLanguage} onChange={(event) => setTemplateLanguage(event.target.value)} /></div>
+            <div className="field"><label htmlFor="template-purpose">Purpose</label><input id="template-purpose" className="input" value={templatePurpose} onChange={(event) => setTemplatePurpose(event.target.value)} placeholder="media outreach" /></div>
+            <div className="field"><label htmlFor="template-tags">Tags</label><input id="template-tags" className="input" value={templateTags} onChange={(event) => setTemplateTags(event.target.value)} placeholder="media, japan" /></div>
             <button className="button buttonPrimary buttonSmall" type="button" onClick={saveTemplate} disabled={savingTemplate || !templateName.trim() || !draft.subject.trim() || !draft.bodyHtml.trim()}>{savingTemplate ? 'Saving...' : 'Save current as template'}</button>
           </div>
           {templateMessage && <div className="successText">{templateMessage}</div>}
@@ -82,4 +101,23 @@ export function CampaignBuilder({ campaignName, draft, onCampaignNameChange, onD
       </div>
     </section>
   );
+}
+
+function TemplateEditForm({ template, onSave }: { template: EmailTemplateRecord; onSave: (input: Partial<EmailTemplateRecord>) => Promise<void> }) {
+  const [name, setName] = useState(template.name);
+  const [description, setDescription] = useState(template.description);
+  const [subject, setSubject] = useState(template.subject);
+  const [language, setLanguage] = useState(template.language);
+  const [purpose, setPurpose] = useState(template.purpose);
+  const [tags, setTags] = useState(template.tags.join(', '));
+  const [saving, setSaving] = useState(false);
+  return <div className="templateEditForm">
+    <input className="input" aria-label="Edit template name" value={name} onChange={(event) => setName(event.target.value)} />
+    <input className="input" aria-label="Edit template description" value={description} onChange={(event) => setDescription(event.target.value)} />
+    <input className="input" aria-label="Edit template subject" value={subject} onChange={(event) => setSubject(event.target.value)} />
+    <input className="input" aria-label="Edit template language" value={language} onChange={(event) => setLanguage(event.target.value)} />
+    <input className="input" aria-label="Edit template purpose" value={purpose} onChange={(event) => setPurpose(event.target.value)} />
+    <input className="input" aria-label="Edit template tags" value={tags} onChange={(event) => setTags(event.target.value)} />
+    <button className="button buttonPrimary buttonSmall" type="button" disabled={saving} onClick={async () => { setSaving(true); try { await onSave({ name, description, subject, language, purpose, tags: tags.split(',').map((tag) => tag.trim()).filter(Boolean) }); } finally { setSaving(false); } }}>{saving ? 'Saving...' : 'Save edit'}</button>
+  </div>;
 }

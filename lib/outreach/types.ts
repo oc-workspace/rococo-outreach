@@ -33,10 +33,16 @@ export interface EmailDraft {
 
 export interface EmailTemplateRecord {
   id: string;
+  templateKey: string;
+  version: number;
+  isCurrent: boolean;
   name: string;
   description: string;
   subject: string;
   bodyHtml: string;
+  language: LanguageCode;
+  purpose: string;
+  tags: string[];
   status: 'active' | 'archived' | string;
   createdAt: string;
   updatedAt: string;

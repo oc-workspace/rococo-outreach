@@ -93,7 +93,7 @@ export function OutreachApp() {
       setTemplatesLoading(true);
       setTemplatesError(null);
       try {
-        const response = await fetch('/api/templates', { cache: 'no-store' });
+        const response = await fetch('/api/templates?includeArchived=true', { cache: 'no-store' });
         const payload = await response.json().catch(() => null);
         if (!response.ok) throw new Error(payload?.error ?? 'Failed to load templates');
         if (!cancelled) setTemplates(payload?.data ?? []);
@@ -317,18 +317,45 @@ export function OutreachApp() {
     resetSendGuards();
   }
 
-  async function saveTemplate(name: string, description: string) {
+  async function saveTemplate(input: Partial<EmailTemplateRecord> & { name: string; description: string }) {
     setTemplatesError(null);
     const response = await fetch('/api/templates', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name, description, subject: draft.subject, bodyHtml: draft.bodyHtml }),
+      body: JSON.stringify({ ...input, subject: draft.subject, bodyHtml: draft.bodyHtml }),
     });
     const payload = await response.json().catch(() => null);
     if (!response.ok) throw new Error(payload?.error ?? 'Failed to save template');
     const template = payload?.data as EmailTemplateRecord | undefined;
     if (!template) throw new Error('Template save returned no record');
     setTemplates((current) => [template, ...current.filter((item) => item.id !== template.id)]);
+  }
+
+  async function updateTemplate(id: string, input: Partial<EmailTemplateRecord> & { createVersion?: boolean }) {
+    const response = await fetch(`/api/templates/${id}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(input) });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(payload?.error ?? 'Failed to update template');
+    const template = payload?.data as EmailTemplateRecord;
+    setTemplates((current) => [template, ...current.filter((item) => item.templateKey !== template.templateKey)]);
+    return template;
+  }
+
+  async function archiveTemplate(template: EmailTemplateRecord) {
+    const response = await fetch(`/api/templates/${template.id}`, { method: template.status === 'archived' ? 'PATCH' : 'DELETE', headers: { 'content-type': 'application/json' }, body: template.status === 'archived' ? JSON.stringify({ status: 'active' }) : undefined });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(payload?.error ?? 'Failed to change template status');
+    const next = payload?.data as EmailTemplateRecord;
+    setTemplates((current) => current.map((item) => item.id === next.id ? next : item));
+  }
+
+  async function switchTemplateVersion(template: EmailTemplateRecord, version: number) {
+    const response = await fetch(`/api/templates/${template.id}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ switchToVersion: version }) });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(payload?.error ?? 'Failed to switch template version');
+    const refreshed = await fetch('/api/templates?includeArchived=true', { cache: 'no-store' });
+    const refreshedPayload = await refreshed.json().catch(() => null);
+    if (!refreshed.ok) throw new Error(refreshedPayload?.error ?? 'Failed to refresh templates');
+    setTemplates(refreshedPayload?.data ?? []);
   }
 
   function addRow() {
@@ -492,7 +519,7 @@ export function OutreachApp() {
           <section className="tabPane composeGrid">
             <div className="composeLeft">
               <SenderSettings senders={senders} selectedSenderId={selectedSenderId} replyToEmail={replyToEmail} loading={sendersLoading} error={sendersError} onSenderChange={updateSender} onReplyToEmailChange={(value) => { setReplyToEmail(value); resetSendGuards(); }} />
-              <CampaignBuilder campaignName={campaignName} draft={draft} onCampaignNameChange={(value) => { setCampaignName(value); resetSendGuards(); }} onDraftChange={updateDraft} templates={templates} templatesLoading={templatesLoading} templatesError={templatesError} onApplyTemplate={applyTemplate} onSaveTemplate={saveTemplate} />
+              <CampaignBuilder campaignName={campaignName} draft={draft} onCampaignNameChange={(value) => { setCampaignName(value); resetSendGuards(); }} onDraftChange={updateDraft} templates={templates} templatesLoading={templatesLoading} templatesError={templatesError} onApplyTemplate={applyTemplate} onSaveTemplate={saveTemplate} onUpdateTemplate={updateTemplate} onArchiveTemplate={archiveTemplate} onSwitchTemplateVersion={switchTemplateVersion} />
               <RecipientRows rows={rows} contacts={contacts} hasDuplicate={duplicateRecipients} onAddRow={addRow} onRemoveRow={removeRow} onUpdateRow={updateRow} />
             </div>
             <div className="composeRight">
