@@ -6,6 +6,19 @@ test.beforeEach(async ({ page }) => {
   await login(page);
 });
 
+test('autosaves the campaign draft and restores it after refresh', async ({ page }) => {
+  await openTab(page, 'Compose');
+  await page.getByLabel('Campaign name').fill('Persisted outreach draft');
+  await page.getByLabel('Subject').fill('Saved subject for {{company}}');
+  await expect(page.locator('.draftSaveStatus')).toContainText('Draft saved', { timeout: 10_000 });
+
+  await page.reload();
+  await openTab(page, 'Compose');
+  await expect(page.getByLabel('Campaign name')).toHaveValue('Persisted outreach draft');
+  await expect(page.getByLabel('Subject')).toHaveValue('Saved subject for {{company}}');
+  await expect(page.locator('.draftSaveStatus')).toContainText('Draft saved', { timeout: 10_000 });
+});
+
 test('requires preview and second confirmation before simulated send', async ({ page }) => {
   await openTab(page, 'Compose');
   await expect(page.getByRole('button', { name: /Send 1 independent email/ })).toHaveCount(0);

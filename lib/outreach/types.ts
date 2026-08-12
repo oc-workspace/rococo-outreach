@@ -110,3 +110,17 @@ export interface CampaignRecord {
 export interface CampaignListResponse {
   data: CampaignRecord[];
 }
+
+export interface CampaignDraftRecord {
+  id: string;
+  workspaceKey: string;
+  campaignName: string;
+  draftTitle: string;
+  subject: string;
+  bodyHtml: string;
+  senderId: string | null;
+  replyToEmail: string;
+  recipientRows: RecipientRow[];
+  createdAt: string;
+  updatedAt: string;
+}

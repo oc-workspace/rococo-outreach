@@ -11,7 +11,7 @@ import { LogoutButton } from './LogoutButton';
 import { initialDraft, initialRecipients } from '@/lib/outreach/seed';
 import { hasDuplicateRecipients, renderRecipientEmail } from '@/lib/outreach/render';
 import { validateCampaignSend } from '@/lib/outreach/validation';
-import type { CampaignRecord, ContactStatus, EmailContact, EmailDraft, EmailSender, EmailTemplateRecord, RecipientRow } from '@/lib/outreach/types';
+import type { CampaignDraftRecord, CampaignRecord, ContactStatus, EmailContact, EmailDraft, EmailSender, EmailTemplateRecord, RecipientRow } from '@/lib/outreach/types';
 import type { SendValidationError, SendValidationMode } from '@/lib/outreach/validation';
 
 type WorkspaceTab = 'contacts' | 'campaign' | 'compose';
@@ -46,6 +46,9 @@ export function OutreachApp() {
   const [replyToEmail, setReplyToEmail] = useState('');
   const [draft, setDraft] = useState<EmailDraft>(initialDraft);
   const [rows, setRows] = useState<RecipientRow[]>(initialRecipients);
+  const [draftHydrated, setDraftHydrated] = useState(false);
+  const [draftSaveState, setDraftSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [draftSaveError, setDraftSaveError] = useState<string | null>(null);
   const [previewed, setPreviewed] = useState(false);
   const [testRecipientEmail, setTestRecipientEmail] = useState('');
   const [validationErrors, setValidationErrors] = useState<SendValidationError[]>([]);
@@ -85,6 +88,64 @@ export function OutreachApp() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadCampaignDraft() {
+      try {
+        const response = await fetch('/api/campaign-draft', { cache: 'no-store' });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok) throw new Error(payload?.error ?? 'Failed to load campaign draft');
+        const saved = payload?.data as CampaignDraftRecord | null;
+        if (!cancelled && saved) {
+          setCampaignName(saved.campaignName);
+          setDraft((current) => ({ ...current, id: saved.id, title: saved.draftTitle, subject: saved.subject, bodyHtml: saved.bodyHtml, updatedAt: saved.updatedAt }));
+          setRows(saved.recipientRows);
+          setSelectedSenderId(saved.senderId ?? '');
+          setReplyToEmail(saved.replyToEmail);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setDraftSaveState('error');
+          setDraftSaveError(error instanceof Error ? error.message : 'Failed to load campaign draft');
+        }
+      } finally {
+        if (!cancelled) setDraftHydrated(true);
+      }
+    }
+    loadCampaignDraft();
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (!draftHydrated) return;
+    setDraftSaveState('saving');
+    setDraftSaveError(null);
+    const timer = window.setTimeout(async () => {
+      try {
+        const response = await fetch('/api/campaign-draft', {
+          method: 'PUT',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            campaignName,
+            draftTitle: draft.title,
+            subject: draft.subject,
+            bodyHtml: draft.bodyHtml,
+            senderId: selectedSenderId || null,
+            replyToEmail,
+            recipientRows: rows,
+          }),
+        });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok) throw new Error(payload?.error ?? 'Failed to save campaign draft');
+        setDraftSaveState('saved');
+      } catch (error) {
+        setDraftSaveState('error');
+        setDraftSaveError(error instanceof Error ? error.message : 'Failed to save campaign draft');
+      }
+    }, 500);
+    return () => window.clearTimeout(timer);
+  }, [draftHydrated, campaignName, draft.title, draft.subject, draft.bodyHtml, selectedSenderId, replyToEmail, rows]);
 
   useEffect(() => {
     let cancelled = false;
@@ -519,7 +580,7 @@ export function OutreachApp() {
           <section className="tabPane composeGrid">
             <div className="composeLeft">
               <SenderSettings senders={senders} selectedSenderId={selectedSenderId} replyToEmail={replyToEmail} loading={sendersLoading} error={sendersError} onSenderChange={updateSender} onReplyToEmailChange={(value) => { setReplyToEmail(value); resetSendGuards(); }} />
-              <CampaignBuilder campaignName={campaignName} draft={draft} onCampaignNameChange={(value) => { setCampaignName(value); resetSendGuards(); }} onDraftChange={updateDraft} templates={templates} templatesLoading={templatesLoading} templatesError={templatesError} onApplyTemplate={applyTemplate} onSaveTemplate={saveTemplate} onUpdateTemplate={updateTemplate} onArchiveTemplate={archiveTemplate} onSwitchTemplateVersion={switchTemplateVersion} />
+              <CampaignBuilder campaignName={campaignName} draft={draft} draftSaveState={draftSaveState} draftSaveError={draftSaveError} onCampaignNameChange={(value) => { setCampaignName(value); resetSendGuards(); }} onDraftChange={updateDraft} templates={templates} templatesLoading={templatesLoading} templatesError={templatesError} onApplyTemplate={applyTemplate} onSaveTemplate={saveTemplate} onUpdateTemplate={updateTemplate} onArchiveTemplate={archiveTemplate} onSwitchTemplateVersion={switchTemplateVersion} />
               <RecipientRows rows={rows} contacts={contacts} hasDuplicate={duplicateRecipients} onAddRow={addRow} onRemoveRow={removeRow} onUpdateRow={updateRow} />
             </div>
             <div className="composeRight">

@@ -6,6 +6,7 @@ export const prisma = new PrismaClient();
 
 export async function resetDatabase() {
   await prisma.emailCampaign.deleteMany();
+  await prisma.emailCampaignDraft.deleteMany();
   await prisma.emailTemplate.deleteMany();
   await prisma.emailContact.deleteMany();
   await prisma.emailSender.deleteMany();

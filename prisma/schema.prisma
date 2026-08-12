@@ -92,6 +92,23 @@ model EmailCampaign {
   @@map("email_campaigns")
 }
 
+model EmailCampaignDraft {
+  id           String   @id @default(cuid())
+  workspaceKey String   @unique @default("default")
+  campaignName String
+  draftTitle   String
+  subject      String
+  bodyHtml     String
+  senderId     String?
+  replyToEmail String   @default("")
+  recipientRows Json
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([updatedAt])
+  @@map("email_campaign_drafts")
+}
+
 model EmailCampaignDelivery {
   id                String        @id @default(cuid())
   campaignId        String

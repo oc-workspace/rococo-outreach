@@ -5,6 +5,8 @@ import type { EmailDraft, EmailTemplateRecord } from '@/lib/outreach/types';
 interface Props {
   campaignName: string;
   draft: EmailDraft;
+  draftSaveState: 'idle' | 'saving' | 'saved' | 'error';
+  draftSaveError: string | null;
   onCampaignNameChange: (value: string) => void;
   onDraftChange: (patch: Partial<EmailDraft>) => void;
   templates: EmailTemplateRecord[];
@@ -17,7 +19,7 @@ interface Props {
   onSwitchTemplateVersion: (template: EmailTemplateRecord, version: number) => Promise<void>;
 }
 
-export function CampaignBuilder({ campaignName, draft, onCampaignNameChange, onDraftChange, templates, templatesLoading, templatesError, onApplyTemplate, onSaveTemplate, onUpdateTemplate, onArchiveTemplate, onSwitchTemplateVersion }: Props) {
+export function CampaignBuilder({ campaignName, draft, draftSaveState, draftSaveError, onCampaignNameChange, onDraftChange, templates, templatesLoading, templatesError, onApplyTemplate, onSaveTemplate, onUpdateTemplate, onArchiveTemplate, onSwitchTemplateVersion }: Props) {
   const [templateName, setTemplateName] = useState('');
   const [templateDescription, setTemplateDescription] = useState('');
   const [templateLanguage, setTemplateLanguage] = useState('en');
@@ -49,6 +51,7 @@ export function CampaignBuilder({ campaignName, draft, onCampaignNameChange, onD
       <div className="panelHeader">
         <div>
           <h2 className="panelTitle">Campaign draft</h2>
+          <span className={`draftSaveStatus draftSaveStatus-${draftSaveState}`} aria-live="polite">{draftSaveState === 'saving' ? 'Saving draft...' : draftSaveState === 'saved' ? 'Draft saved' : draftSaveState === 'error' ? (draftSaveError || 'Draft save failed') : 'Draft persistence ready'}</span>
           <p className="panelNote">
             Use tokens: <span className="kbd">{'{{salutation}}'}</span> <span className="kbd">{'{{company}}'}</span> <span className="kbd">{'{{mediaName}}'}</span>.
           </p>

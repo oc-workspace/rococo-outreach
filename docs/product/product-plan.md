@@ -266,8 +266,9 @@ Current status as of 2026-08-12: contact search/filtering/tags, bulk contact
 selection, reusable-template save/apply/edit, archive/restore, language/purpose/
 tag metadata, version history and switching, all listed token replacements (plus
 `displayName` and `email`), and manual retry for failed deliveries are deployed
-in the current implementation branch. Attachments, campaign duplication, and
-database-backed campaign draft persistence remain incomplete.
+in the current implementation branch. Database-backed Campaign draft autosave
+and refresh recovery are now implemented. Attachments and campaign duplication
+remain incomplete.
 
 ### Version 3
 
@@ -287,8 +288,9 @@ This version adds operational and growth controls:
 
 Completed foundation: a usable frontend workflow with explicit safety states.
 
-- Campaign draft and recipient-row editing remain frontend state, while contacts,
-  templates, send history, campaigns, and deliveries are API/database-backed.
+- Campaign draft and recipient-row editing are autosaved through an authenticated
+  API/database record, while contacts, templates, send history, campaigns, and
+  deliveries are API/database-backed.
 - Real Campaign sending uses the protected backend SMTP path and follows the
   one-recipient-per-send rule. A development-only failure simulator remains for
   safe partial-failure testing.
@@ -308,8 +310,9 @@ frontend state to persistent API-backed data.
 - Contacts CRUD/import, template save/apply/edit, archive/restore, versioned
   metadata, Campaign History, and delivery status are database-backed.
 - Campaigns and recipient deliveries are persisted before sending.
-- Draft persistence is the main remaining gap in this slice; the current Compose
-  draft is still browser state and is lost on reload.
+- Draft persistence is implemented for the single internal workspace with
+  debounced autosave and refresh recovery. Multi-workspace draft ownership and
+  campaign duplication remain future work.
 - Preview, test-send, second confirmation, one-by-one sending, idempotency, and
   manual retry safety gates remain in place.
 

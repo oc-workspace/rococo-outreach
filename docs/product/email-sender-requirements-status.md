@@ -118,6 +118,9 @@ Implemented frontend boundaries:
   history, and switching to a prior version.
 - [x] Added Playwright coverage for template metadata, editing, version history,
   version switching, archive, and restore; the isolated suite passes all 9 tests.
+- [x] Added a database-backed, authenticated Campaign draft API with server-side
+  validation, HTML sanitization, debounced autosave, refresh recovery, and
+  Playwright coverage; the full isolated suite passes all 10 tests.
 
 ## Not Done Yet
 
@@ -131,7 +134,7 @@ Implemented frontend boundaries:
 - [ ] Replace the current single SMTP mailbox environment configuration with a persistent mailbox-account authorization model before supporting multiple mailbox-backed senders.
 - [ ] Replace the current shared operator credential with workspace/team identities and role-based authorization before the internal tool needs multiple access levels.
 - [ ] Add campaign pacing, a durable send queue, and a way to stop deliveries that have not started before increasing send volume.
-- [ ] Persist Compose drafts with autosave and recovery; the current draft remains browser state.
+- [ ] Add multi-workspace draft ownership and campaign duplication.
 
 ## Risks / Tradeoffs
 
