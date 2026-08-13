@@ -11,7 +11,7 @@ import { LogoutButton } from './LogoutButton';
 import { initialDraft, initialRecipients } from '@/lib/outreach/seed';
 import { hasDuplicateRecipients, renderRecipientEmail } from '@/lib/outreach/render';
 import { validateCampaignSend } from '@/lib/outreach/validation';
-import type { CampaignDraftRecord, CampaignRecord, ContactStatus, EmailContact, EmailDraft, EmailSender, EmailTemplateRecord, RecipientRow } from '@/lib/outreach/types';
+import type { CampaignDraftRecord, CampaignQueueSnapshot, CampaignRecord, ContactStatus, EmailContact, EmailDraft, EmailSender, EmailTemplateRecord, RecipientRow } from '@/lib/outreach/types';
 import type { SendValidationError, SendValidationMode } from '@/lib/outreach/validation';
 
 type WorkspaceTab = 'contacts' | 'campaign' | 'compose';
@@ -64,6 +64,7 @@ export function OutreachApp() {
   const [campaignIdempotencyKey, setCampaignIdempotencyKey] = useState('');
   const [retryingCampaignId, setRetryingCampaignId] = useState<string | null>(null);
   const [cancellingCampaignId, setCancellingCampaignId] = useState<string | null>(null);
+  const [queueSnapshot, setQueueSnapshot] = useState<CampaignQueueSnapshot | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -103,6 +104,22 @@ export function OutreachApp() {
     }, 1000);
     return () => window.clearInterval(timer);
   }, [campaigns]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadQueueStatus() {
+      try {
+        const response = await fetch('/api/campaigns/queue-status', { cache: 'no-store' });
+        const payload = await response.json().catch(() => null);
+        if (response.ok && !cancelled) setQueueSnapshot(payload?.data ?? null);
+      } catch {
+        // Keep the last visible queue state.
+      }
+    }
+    loadQueueStatus();
+    const timer = window.setInterval(loadQueueStatus, 5000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -604,7 +621,7 @@ export function OutreachApp() {
 
         {activeTab === 'campaign' && (
           <section className="tabPane tabPaneWide">
-            <HistoryPanel campaigns={campaigns} loading={campaignsLoading} error={campaignsError} onRetry={retryFailedCampaign} retryingCampaignId={retryingCampaignId} onCancel={cancelCampaign} cancellingCampaignId={cancellingCampaignId} />
+            <HistoryPanel campaigns={campaigns} loading={campaignsLoading} error={campaignsError} queueSnapshot={queueSnapshot} onRetry={retryFailedCampaign} retryingCampaignId={retryingCampaignId} onCancel={cancelCampaign} cancellingCampaignId={cancellingCampaignId} />
           </section>
         )}
 

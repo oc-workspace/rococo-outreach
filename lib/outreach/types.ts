@@ -106,6 +106,25 @@ export interface CampaignRecord {
   createdAt: string;
   sentAt?: string;
   deliveries: DeliveryRecord[];
+  auditLogs: CampaignAuditLog[];
+}
+
+export interface CampaignAuditLog {
+  id: string;
+  action: string;
+  actor: string;
+  details: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+export interface CampaignQueueSnapshot {
+  worker: 'running' | 'starting' | 'unavailable';
+  activeCampaigns: number;
+  pendingDeliveries: number;
+  sendingDeliveries: number;
+  nextAllowedAt: string | null;
+  lastError: string | null;
+  lastErrorAt: string | null;
 }
 
 export interface CampaignListResponse {

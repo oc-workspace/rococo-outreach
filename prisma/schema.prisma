@@ -88,6 +88,7 @@ model EmailCampaign {
   sentAt       DateTime?
   deliveries   EmailCampaignDelivery[]
   retries      EmailCampaignRetry[]
+  auditLogs    EmailCampaignAuditLog[]
 
   @@index([status])
   @@index([createdAt])
@@ -129,6 +130,7 @@ model EmailCampaignDelivery {
   sentAt            DateTime?
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
+  auditLogs         EmailCampaignAuditLog[]
 
   @@index([campaignId])
   @@index([sendStatus])
@@ -149,6 +151,23 @@ model EmailCampaignRetry {
   @@index([campaignId])
   @@index([status])
   @@map("email_campaign_retries")
+}
+
+model EmailCampaignAuditLog {
+  id         String                  @id @default(cuid())
+  campaignId String?
+  campaign   EmailCampaign?          @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  deliveryId String?
+  delivery   EmailCampaignDelivery?  @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+  action     String
+  actor      String                  @default("operator")
+  details    Json?
+  createdAt  DateTime                @default(now())
+
+  @@index([campaignId, createdAt])
+  @@index([deliveryId, createdAt])
+  @@index([action, createdAt])
+  @@map("email_campaign_audit_logs")
 }
 
 model EmailSendRateLimit {

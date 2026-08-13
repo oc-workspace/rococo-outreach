@@ -34,6 +34,7 @@ type CampaignRecordRow = {
   createdAt: Date;
   sentAt: Date | null;
   deliveries: DeliveryRecordRow[];
+  auditLogs?: Array<{ id: string; action: string; actor: string; details: unknown; createdAt: Date }>;
 };
 
 function toDeliveryStatus(status: string): DeliveryRecord['sendStatus'] {
@@ -80,5 +81,10 @@ export function toCampaignRecord(row: CampaignRecordRow): CampaignRecord {
       lastAttemptAt: delivery.lastAttemptAt?.toISOString(),
       sentAt: delivery.sentAt?.toISOString(),
     })),
+    auditLogs: (row.auditLogs ?? []).map((log) => ({ id: log.id, action: log.action, actor: log.actor, details: isRecord(log.details) ? log.details : null, createdAt: log.createdAt.toISOString() })),
   };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
 }

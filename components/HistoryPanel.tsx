@@ -1,6 +1,6 @@
-import type { CampaignRecord } from '@/lib/outreach/types';
+import type { CampaignQueueSnapshot, CampaignRecord } from '@/lib/outreach/types';
 
-export function HistoryPanel({ campaigns, loading = false, error = null, onRetry, retryingCampaignId = null, onCancel, cancellingCampaignId = null }: { campaigns: CampaignRecord[]; loading?: boolean; error?: string | null; onRetry?: (campaignId: string) => void; retryingCampaignId?: string | null; onCancel?: (campaignId: string) => void; cancellingCampaignId?: string | null }) {
+export function HistoryPanel({ campaigns, loading = false, error = null, queueSnapshot = null, onRetry, retryingCampaignId = null, onCancel, cancellingCampaignId = null }: { campaigns: CampaignRecord[]; loading?: boolean; error?: string | null; queueSnapshot?: CampaignQueueSnapshot | null; onRetry?: (campaignId: string) => void; retryingCampaignId?: string | null; onCancel?: (campaignId: string) => void; cancellingCampaignId?: string | null }) {
   return (
     <section className="panel">
       <div className="panelHeader">
@@ -9,6 +9,7 @@ export function HistoryPanel({ campaigns, loading = false, error = null, onRetry
           <p className="panelNote">Campaign totals and recipient-level delivery records.</p>
         </div>
       </div>
+      {queueSnapshot && <div className="panelBody"><div className="rowWrap"><span className="pill">Queue {queueSnapshot.worker}</span><span className="pill">active campaigns {queueSnapshot.activeCampaigns}</span><span className="pill">pending {queueSnapshot.pendingDeliveries}</span><span className="pill">sending {queueSnapshot.sendingDeliveries}</span>{queueSnapshot.nextAllowedAt && <span className="pill">next slot {new Date(queueSnapshot.nextAllowedAt).toLocaleTimeString()}</span>}{queueSnapshot.lastError && <span className="pill statusBlocked">last error {queueSnapshot.lastError}</span>}</div></div>}
       <div className="panelBody">
         {loading && <div className="empty">Loading campaign history...</div>}
         {error && <div className="warning">{error}</div>}
@@ -20,6 +21,7 @@ export function HistoryPanel({ campaigns, loading = false, error = null, onRetry
               <div className="deliveryGrid">
                 {campaign.deliveries.map((delivery) => <><span key={`${delivery.id}-email`}>{delivery.to}</span><span key={`${delivery.id}-status`}>{delivery.sendStatus} · attempts {delivery.attemptCount}</span></>)}
               </div>
+              {campaign.auditLogs.length > 0 && <details><summary>Audit trail ({campaign.auditLogs.length})</summary><div className="deliveryGrid">{campaign.auditLogs.slice(0, 8).map((log) => <><span key={`${log.id}-action`}>{log.action}</span><span key={`${log.id}-time`}>{new Date(log.createdAt).toLocaleString()} · {log.actor}</span></>)}</div></details>}
             </article>
           ))}
           {campaigns.length === 0 && <div className="empty">No campaigns sent yet.</div>}

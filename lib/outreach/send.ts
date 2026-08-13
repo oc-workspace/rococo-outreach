@@ -31,5 +31,6 @@ export function sendCampaignOneByOne(params: { name: string; draft: EmailDraft; 
     createdAt: now,
     sentAt: now,
     deliveries,
+    auditLogs: [],
   };
 }

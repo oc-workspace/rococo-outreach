@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
   const campaign = await prisma.emailCampaign.findUnique({
     where: { id: params.id },
-    include: { deliveries: { orderBy: { createdAt: 'asc' } } },
+    include: { deliveries: { orderBy: { createdAt: 'asc' } }, auditLogs: { orderBy: { createdAt: 'desc' }, take: 50 } },
   });
 
   if (!campaign) return NextResponse.json({ error: 'Campaign not found' }, { status: 404 });

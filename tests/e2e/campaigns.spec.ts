@@ -119,3 +119,41 @@ test('queues a campaign and stops deliveries that have not started', async ({ pa
   expect(campaign.deliveries.every((delivery: { sendStatus: string }) => delivery.sendStatus !== 'pending')).toBe(true);
   expect(['cancelled', 'sent']).toContain(campaign.status);
 });
+
+test('records the Campaign audit trail and exposes queue status', async ({ page }) => {
+  const headers = { 'content-type': 'application/json', 'idempotency-key': 'e2e-audit-queue-0001' };
+  const payload = {
+    name: 'Audited queue campaign',
+    subject: 'Audited subject',
+    bodyHtml: '<p>Hello</p>',
+    senderId: 'smtp-winnie-next2p',
+    senderEmail: 'winnie@next2p.com',
+    senderName: 'Winnie',
+    replyToEmail: 'winnie@next2p.com',
+    deliveries: [{ contactId: 'contact-1', to: 'editor@techdaily.example', subject: 'Audited subject', bodyHtml: '<p>Hello</p>', bodyText: 'ignored', salutation: 'Hi Maya', warnings: [] }],
+  };
+
+  const response = await page.request.post('/api/campaigns/send', { headers, data: payload });
+  expect(response.status()).toBe(200);
+  const queued = (await response.json()).data;
+
+  await expect.poll(async () => {
+    const detail = await page.request.get('/api/campaigns/' + queued.id);
+    const campaign = (await detail.json()).data;
+    return {
+      status: campaign.status,
+      actions: campaign.auditLogs.map((log: { action: string }) => log.action),
+    };
+  }, { timeout: 15_000 }).toEqual({
+    status: 'sent',
+    actions: expect.arrayContaining(['campaign_queued', 'delivery_claimed', 'delivery_sent', 'campaign_completed']),
+  });
+
+  const queueStatus = await page.request.get('/api/campaigns/queue-status');
+  expect(queueStatus.status()).toBe(200);
+  const snapshot = (await queueStatus.json()).data;
+  expect(snapshot.worker).toBe('running');
+  expect(snapshot.activeCampaigns).toBe(0);
+  expect(snapshot.pendingDeliveries).toBe(0);
+  expect(snapshot.sendingDeliveries).toBe(0);
+});

@@ -5,6 +5,7 @@ import type { RenderedEmail } from './types';
 import { htmlToText } from './render';
 import { sanitizeEmailHtml } from './htmlSafety';
 import { finalizeCampaign, wakeCampaignQueueWorker } from './queueWorker';
+import { writeCampaignAudit } from './audit';
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const maxRecipients = 50;
@@ -113,6 +114,7 @@ export async function sendAndPersistCampaign(input: SendCampaignInput, idempoten
       },
       include: { deliveries: { orderBy: { createdAt: 'asc' } } },
     });
+    await writeCampaignAudit(prisma, { campaignId: campaign.id, action: 'campaign_queued', details: { totalCount: campaign.totalCount } });
     wakeCampaignQueueWorker(prisma);
     return campaign;
   } catch (error) {
@@ -184,6 +186,7 @@ export async function retryFailedCampaign(campaignId: string, idempotencyKey: st
     data: { status: 'queued', sentAt: null, simulationFailureRecipient: null },
     include: { deliveries: { orderBy: { createdAt: 'asc' } } },
   });
+  await writeCampaignAudit(prisma, { campaignId: queued.id, action: 'campaign_retry_queued', details: { retryCount: failedDeliveries.length } });
   wakeCampaignQueueWorker(prisma);
   void retryRequest;
   return finalizeCampaign(prisma, queued.id).then(() => prisma.emailCampaign.findUniqueOrThrow({

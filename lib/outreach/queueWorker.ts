@@ -2,6 +2,7 @@ import { Prisma, type PrismaClient } from '@prisma/client';
 import { createSimulatedMailTransport, isSimulatedMailTransportRequired } from '@/lib/mail/simulatedTransport';
 import { createTencentEnterpriseMailTransport } from '@/lib/mail/transportFactory';
 import type { MailTransport } from '@/lib/mail/transport';
+import { writeCampaignAudit } from './audit';
 
 const defaultSendIntervalMs = 6_000;
 const pollIntervalMs = 1_000;
@@ -17,6 +18,7 @@ type QueueCandidate = {
   renderedBodyHtml: string;
   renderedBodyText: string;
   simulationFailureRecipient: string | null;
+  attemptCount: number;
 };
 
 type ClaimResult = {
@@ -67,6 +69,12 @@ class CampaignQueueWorker {
     try {
       const claim = await claimNextDelivery(this.client);
       if (claim.candidate) {
+        await writeCampaignAudit(this.client, {
+          campaignId: claim.candidate.campaignId,
+          deliveryId: claim.candidate.id,
+          action: 'delivery_claimed',
+          details: { attempt: claim.candidate.attemptCount },
+        });
         await sendClaimedDelivery(this.client, claim.candidate);
         this.schedule(0);
         return;
@@ -81,6 +89,31 @@ class CampaignQueueWorker {
 
 export function wakeCampaignQueueWorker(client: PrismaClient): void {
   startCampaignQueueWorker(client);
+}
+
+export async function getCampaignQueueSnapshot(client: PrismaClient) {
+  const [pendingDeliveries, sendingDeliveries, activeCampaigns, failedDeliveries, nextRateLimit] = await Promise.all([
+    client.emailCampaignDelivery.count({ where: { sendStatus: 'pending' } }),
+    client.emailCampaignDelivery.count({ where: { sendStatus: 'sending' } }),
+    client.emailCampaign.count({ where: { status: { in: ['queued', 'sending'] } } }),
+    client.emailCampaignDelivery.findFirst({
+      where: { sendStatus: 'failed' },
+      orderBy: { updatedAt: 'desc' },
+      select: { errorMessage: true, updatedAt: true },
+    }),
+    client.emailSendRateLimit.findFirst({ orderBy: { nextAllowedAt: 'asc' }, select: { nextAllowedAt: true } }),
+  ]);
+  return {
+    worker: 'running',
+    activeCampaigns,
+    pendingDeliveries,
+    sendingDeliveries,
+    nextAllowedAt: nextRateLimit && nextRateLimit.nextAllowedAt.getTime() > Date.now()
+      ? nextRateLimit.nextAllowedAt.toISOString()
+      : null,
+    lastError: failedDeliveries?.errorMessage ?? null,
+    lastErrorAt: failedDeliveries?.updatedAt.toISOString() ?? null,
+  };
 }
 
 function getQueueState(): { worker?: CampaignQueueWorker } {
@@ -98,6 +131,11 @@ export async function cancelCampaign(client: PrismaClient, campaignId: string) {
   const cancelled = await client.emailCampaignDelivery.updateMany({
     where: { campaignId, sendStatus: 'pending' },
     data: { sendStatus: 'cancelled', errorMessage: 'Cancelled before send' },
+  });
+  await writeCampaignAudit(client, {
+    campaignId,
+    action: 'campaign_cancel_requested',
+    details: { cancelledCount: cancelled.count },
   });
   await client.emailCampaign.update({
     where: { id: campaignId },
@@ -122,6 +160,7 @@ async function claimNextDelivery(client: PrismaClient): Promise<ClaimResult> {
         d."renderedBodyHtml" AS "renderedBodyHtml",
         d."renderedBodyText" AS "renderedBodyText",
         c."simulationFailureRecipient" AS "simulationFailureRecipient"
+        ,d."attemptCount" AS "attemptCount"
       FROM "email_campaign_deliveries" d
       INNER JOIN "email_campaigns" c ON c."id" = d."campaignId"
       WHERE d."sendStatus" = 'pending'
@@ -189,17 +228,20 @@ async function sendClaimedDelivery(client: PrismaClient, candidate: QueueCandida
         where: { id: candidate.id },
         data: { sendStatus: 'failed', errorMessage: 'SMTP rejected recipient' },
       });
+      await writeCampaignAudit(client, { campaignId: candidate.campaignId, deliveryId: candidate.id, action: 'delivery_failed', details: { reason: 'SMTP rejected recipient' } });
     } else {
       await client.emailCampaignDelivery.update({
         where: { id: candidate.id },
         data: { sendStatus: 'sent', providerMessageId: result.messageId, sentAt: new Date() },
       });
+      await writeCampaignAudit(client, { campaignId: candidate.campaignId, deliveryId: candidate.id, action: 'delivery_sent', details: { providerMessageId: result.messageId } });
     }
   } catch (error) {
     await client.emailCampaignDelivery.update({
       where: { id: candidate.id },
       data: { sendStatus: 'failed', errorMessage: safeSendError(error) },
     });
+    await writeCampaignAudit(client, { campaignId: candidate.campaignId, deliveryId: candidate.id, action: 'delivery_failed', details: { reason: safeSendError(error) } });
   }
   await finalizeCampaign(client, candidate.campaignId);
 }
@@ -246,6 +288,11 @@ export async function finalizeCampaign(client: PrismaClient, campaignId: string)
     },
     include: { deliveries: { orderBy: { createdAt: 'asc' } } },
   });
+  await writeCampaignAudit(client, {
+    campaignId,
+    action: 'campaign_completed',
+    details: { status, successCount, failedCount, cancelledCount },
+  });
   await client.emailCampaignRetry.updateMany({
     where: { campaignId, status: { in: ['queued', 'sending'] } },
     data: { status: 'completed', completedAt: new Date() },
@@ -255,7 +302,7 @@ export async function finalizeCampaign(client: PrismaClient, campaignId: string)
 
 async function recoverStaleDeliveries(client: PrismaClient): Promise<void> {
   const cutoff = new Date(Date.now() - staleDeliveryMs);
-  await client.emailCampaignDelivery.updateMany({
+  const recovered = await client.emailCampaignDelivery.updateMany({
     where: {
       sendStatus: 'sending',
       OR: [{ lastAttemptAt: null }, { lastAttemptAt: { lt: cutoff } }],
@@ -265,6 +312,9 @@ async function recoverStaleDeliveries(client: PrismaClient): Promise<void> {
       errorMessage: 'SMTP send interrupted; review before retrying',
     },
   });
+  if (recovered.count > 0) {
+    await writeCampaignAudit(client, { action: 'delivery_recovered', details: { recoveredCount: recovered.count } });
+  }
 }
 
 async function finalizeAllCampaigns(client: PrismaClient): Promise<void> {
