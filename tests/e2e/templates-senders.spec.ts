@@ -28,6 +28,7 @@ test('exposes only senders from the configured allowed domain', async ({ page })
   const senders = (await response.json()).data as Array<{ email: string }>;
   expect(senders.map((sender) => sender.email)).toEqual(['winnie@next2p.com', 'zeta@next2p.com']);
   expect(senders.some((sender) => sender.email === 'disabled@example.test')).toBe(false);
+  expect(senders.some((sender) => sender.email === 'orphan@next2p.com')).toBe(false);
 });
 
 test('persists and reapplies a reusable template after refresh', async ({ page }) => {

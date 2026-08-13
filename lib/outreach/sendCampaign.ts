@@ -7,6 +7,7 @@ import { sanitizeEmailHtml } from './htmlSafety';
 import { finalizeCampaign, wakeCampaignQueueWorker } from './queueWorker';
 import { writeCampaignAudit } from './audit';
 import { isAllowedSenderEmail } from './senderPolicy';
+import { isMailboxAccountReady, mailboxAccountMatchesSmtp } from './mailboxAccounts';
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const maxRecipients = 50;
@@ -55,17 +56,20 @@ export async function sendAndPersistCampaign(input: SendCampaignInput, idempoten
   }
   if (!Array.isArray(input.deliveries)) throw new CampaignSendError(400, 'Deliveries are required');
 
-  const sender = await prisma.emailSender.findUnique({ where: { id: input.senderId } });
+  const sender = await prisma.emailSender.findUnique({ where: { id: input.senderId }, include: { mailboxAccount: true } });
   if (!sender) throw new CampaignSendError(404, 'Selected sender was not found');
   if (sender.status !== 'active' || !sender.domainVerified || !sender.senderVerified) {
     throw new CampaignSendError(409, 'Selected sender is not eligible for sending');
   }
   if (!isAllowedSenderEmail(sender.email)) throw new CampaignSendError(409, 'Selected sender domain is not allowed');
+  const mailboxAccount = sender.mailboxAccount;
+  if (!isMailboxAccountReady(mailboxAccount)) throw new CampaignSendError(409, 'Selected sender mailbox account is not ready');
 
   const config = readTencentEnterpriseMailConfig();
   const senderEmail = input.senderEmail.trim().toLowerCase();
   if (!isAllowedSenderEmail(senderEmail)) throw new CampaignSendError(409, 'Selected sender domain is not allowed');
   const configuredMailbox = config.user.trim().toLowerCase();
+  if (!mailboxAccountMatchesSmtp(mailboxAccount, config)) throw new CampaignSendError(409, 'Selected sender mailbox account does not match the connected SMTP configuration');
   if (sender.email.trim().toLowerCase() !== senderEmail || senderEmail !== configuredMailbox) {
     throw new CampaignSendError(409, 'Selected sender does not match the connected SMTP mailbox');
   }
@@ -153,12 +157,15 @@ export async function retryFailedCampaign(campaignId: string, idempotencyKey: st
   const failedDeliveries = campaign.deliveries.filter((delivery) => delivery.sendStatus === 'failed');
   if (failedDeliveries.length === 0) return campaign;
 
-  const sender = await prisma.emailSender.findUnique({ where: { id: campaign.senderId ?? '' } });
+  const sender = await prisma.emailSender.findUnique({ where: { id: campaign.senderId ?? '' }, include: { mailboxAccount: true } });
   if (!sender || sender.status !== 'active' || !sender.domainVerified || !sender.senderVerified) {
     throw new CampaignSendError(409, 'Campaign sender is not eligible for retry');
   }
   if (!isAllowedSenderEmail(sender.email) || !isAllowedSenderEmail(campaign.senderEmail)) throw new CampaignSendError(409, 'Campaign sender domain is not allowed');
+  const mailboxAccount = sender.mailboxAccount;
+  if (!isMailboxAccountReady(mailboxAccount)) throw new CampaignSendError(409, 'Campaign sender mailbox account is not ready for retry');
   const config = readTencentEnterpriseMailConfig();
+  if (!mailboxAccountMatchesSmtp(mailboxAccount, config)) throw new CampaignSendError(409, 'Campaign sender mailbox account does not match the connected SMTP configuration');
   if (sender.email.trim().toLowerCase() !== config.user.trim().toLowerCase() || campaign.senderEmail.trim().toLowerCase() !== config.user.trim().toLowerCase()) {
     throw new CampaignSendError(409, 'Campaign sender does not match the connected SMTP mailbox');
   }

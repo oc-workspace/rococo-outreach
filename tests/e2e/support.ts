@@ -10,6 +10,7 @@ export async function resetDatabase() {
   await prisma.emailTemplate.deleteMany();
   await prisma.emailContact.deleteMany();
   await prisma.emailSender.deleteMany();
+  await prisma.emailMailboxAccount.deleteMany();
 
   await prisma.emailContact.createMany({
     data: [
@@ -20,11 +21,19 @@ export async function resetDatabase() {
     ],
   });
 
+  await prisma.emailMailboxAccount.create({
+    data: {
+      id: 'mailbox-winnie-next2p', mailboxEmail: 'winnie@next2p.com', smtpHost: 'localhost.invalid',
+      smtpPort: 465, smtpSecure: true, status: 'active', verificationStatus: 'verified', verifiedAt: new Date(),
+    },
+  });
+
   await prisma.emailSender.createMany({
     data: [
-      { id: 'smtp-winnie-next2p', displayName: 'Winnie', email: 'winnie@next2p.com', domain: 'next2p.com', domainVerified: true, senderVerified: true, status: 'active' },
-      { id: 'smtp-zeta-next2p', displayName: 'Zeta Operator', email: 'zeta@next2p.com', domain: 'next2p.com', domainVerified: true, senderVerified: true, status: 'active' },
+      { id: 'smtp-winnie-next2p', displayName: 'Winnie', email: 'winnie@next2p.com', domain: 'next2p.com', domainVerified: true, senderVerified: true, status: 'active', mailboxAccountId: 'mailbox-winnie-next2p' },
+      { id: 'smtp-zeta-next2p', displayName: 'Zeta Operator', email: 'zeta@next2p.com', domain: 'next2p.com', domainVerified: true, senderVerified: true, status: 'active', mailboxAccountId: 'mailbox-winnie-next2p' },
       { id: 'smtp-disabled', displayName: 'Disabled Sender', email: 'disabled@example.test', domain: 'example.test', domainVerified: false, senderVerified: false, status: 'disabled' },
+      { id: 'smtp-orphan-next2p', displayName: 'Orphan Sender', email: 'orphan@next2p.com', domain: 'next2p.com', domainVerified: true, senderVerified: true, status: 'active' },
     ],
   });
 }

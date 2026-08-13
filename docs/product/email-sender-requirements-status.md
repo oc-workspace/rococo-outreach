@@ -130,14 +130,13 @@ Implemented frontend boundaries:
 
 ## Not Done Yet
 
-- [ ] Decide the final product rule for sender domains:
-  - require the team domain, for example `employee1@pp.com`; or
-  - allow external mailbox domains, for example `employee1@qq.com`.
+- [x] Current product rule: allow only sender addresses ending in `@next2p.com`; the rule remains extensible for future workspace-specific domains.
 - [ ] Add a real sender management UI for creating, editing, disabling, or deleting senders.
 - [ ] Add write APIs for sender management, if the product wants sender management inside this app.
 - [ ] Add workspace/team ownership and permissions for sender records.
 - [ ] Add a real domain and sender verification workflow, including provider/DNS status if needed.
-- [ ] Replace the current single SMTP mailbox environment configuration with a persistent mailbox-account authorization model before supporting multiple mailbox-backed senders.
+- [x] Added the persistent mailbox-account foundation for the current development mailbox, including sender binding, active/verified gates, and SMTP identity matching.
+- [ ] Replace the current environment-configured SMTP credential with a secret-reference mechanism; do not persist SMTP passwords in the database or audit log.
 - [ ] Replace the current shared operator credential with workspace/team identities and role-based authorization before the internal tool needs multiple access levels.
 - [x] Added sender-level campaign pacing, a durable Campaign send queue,
   startup recovery, failed-delivery requeue, and a way to stop deliveries that

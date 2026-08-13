@@ -163,8 +163,12 @@ async function claimNextDelivery(client: PrismaClient): Promise<ClaimResult> {
         ,d."attemptCount" AS "attemptCount"
       FROM "email_campaign_deliveries" d
       INNER JOIN "email_campaigns" c ON c."id" = d."campaignId"
+      INNER JOIN "email_senders" s ON s."id" = c."senderId"
+      INNER JOIN "email_mailbox_accounts" a ON a."id" = s."mailboxAccountId"
       WHERE d."sendStatus" = 'pending'
         AND c."status" IN ('queued', 'sending')
+        AND a."status" = 'active'
+        AND a."verificationStatus" = 'verified'
       ORDER BY d."createdAt" ASC, d."id" ASC
       FOR UPDATE OF d, c SKIP LOCKED
       LIMIT 1

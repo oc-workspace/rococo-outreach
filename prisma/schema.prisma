@@ -36,12 +36,36 @@ model EmailSender {
   domainVerified  Boolean  @default(false)
   senderVerified  Boolean  @default(false)
   status          String   @default("inactive")
+  mailboxAccountId String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+  mailboxAccount  EmailMailboxAccount? @relation(fields: [mailboxAccountId], references: [id], onDelete: SetNull)
 
   @@index([domain])
   @@index([status])
+  @@index([mailboxAccountId])
   @@map("email_senders")
+}
+
+model EmailMailboxAccount {
+  id                 String    @id @default(cuid())
+  workspaceKey       String    @default("default")
+  provider           String    @default("tencent_enterprise_mail")
+  mailboxEmail       String    @unique
+  smtpHost           String
+  smtpPort           Int       @default(465)
+  smtpSecure         Boolean   @default(true)
+  status             String    @default("inactive")
+  verificationStatus String    @default("unverified")
+  verifiedAt         DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  senders            EmailSender[]
+
+  @@index([workspaceKey, status])
+  @@index([verificationStatus])
+
+  @@map("email_mailbox_accounts")
 }
 
 model EmailTemplate {
