@@ -80,8 +80,10 @@ model EmailCampaign {
   totalCount   Int                     @default(0)
   successCount Int                     @default(0)
   failedCount  Int                     @default(0)
+  cancelledCount Int                   @default(0)
   repliedCount Int                     @default(0)
   status       String                  @default("draft")
+  simulationFailureRecipient String?
   createdAt    DateTime                @default(now())
   sentAt       DateTime?
   deliveries   EmailCampaignDelivery[]
@@ -131,6 +133,7 @@ model EmailCampaignDelivery {
   @@index([campaignId])
   @@index([sendStatus])
   @@index([toEmail])
+  @@index([campaignId, sendStatus, createdAt])
   @@map("email_campaign_deliveries")
 }
 
@@ -146,4 +149,12 @@ model EmailCampaignRetry {
   @@index([campaignId])
   @@index([status])
   @@map("email_campaign_retries")
+}
+
+model EmailSendRateLimit {
+  key           String   @id
+  nextAllowedAt DateTime @db.Timestamptz(3)
+  updatedAt     DateTime @updatedAt @db.Timestamptz(3)
+
+  @@map("email_send_rate_limits")
 }

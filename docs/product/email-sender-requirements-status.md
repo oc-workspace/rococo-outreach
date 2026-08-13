@@ -133,7 +133,10 @@ Implemented frontend boundaries:
 - [ ] Add a real domain and sender verification workflow, including provider/DNS status if needed.
 - [ ] Replace the current single SMTP mailbox environment configuration with a persistent mailbox-account authorization model before supporting multiple mailbox-backed senders.
 - [ ] Replace the current shared operator credential with workspace/team identities and role-based authorization before the internal tool needs multiple access levels.
-- [ ] Add campaign pacing, a durable send queue, and a way to stop deliveries that have not started before increasing send volume.
+- [x] Added sender-level campaign pacing, a durable Campaign send queue,
+  startup recovery, failed-delivery requeue, and a way to stop deliveries that
+  have not started. This is currently implemented for the single development
+  mailbox; multi-mailbox authorization and auditability remain future work.
 - [ ] Add multi-workspace draft ownership and campaign duplication.
 
 ## Risks / Tradeoffs

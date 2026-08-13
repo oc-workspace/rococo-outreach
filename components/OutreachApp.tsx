@@ -63,6 +63,7 @@ export function OutreachApp() {
   const [campaignSending, setCampaignSending] = useState(false);
   const [campaignIdempotencyKey, setCampaignIdempotencyKey] = useState('');
   const [retryingCampaignId, setRetryingCampaignId] = useState<string | null>(null);
+  const [cancellingCampaignId, setCancellingCampaignId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -88,6 +89,20 @@ export function OutreachApp() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (!campaigns.some((campaign) => campaign.status === 'queued' || campaign.status === 'sending')) return;
+    const timer = window.setInterval(async () => {
+      try {
+        const response = await fetch('/api/campaigns', { cache: 'no-store' });
+        const payload = await response.json().catch(() => null);
+        if (response.ok) setCampaigns(payload?.data ?? []);
+      } catch {
+        // Keep the last visible state; the next poll retries.
+      }
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [campaigns]);
 
   useEffect(() => {
     let cancelled = false;
@@ -516,6 +531,23 @@ export function OutreachApp() {
     }
   }
 
+  async function cancelCampaign(campaignId: string) {
+    setCancellingCampaignId(campaignId);
+    setCampaignsError(null);
+    try {
+      const response = await fetch('/api/campaigns/' + campaignId + '/cancel', { method: 'POST' });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error ?? 'Campaign cancellation failed');
+      const campaign = payload?.data as CampaignRecord | undefined;
+      if (!campaign) throw new Error('Campaign cancellation returned no campaign record');
+      setCampaigns((current) => current.map((item) => item.id === campaign.id ? campaign : item));
+    } catch (error) {
+      setCampaignsError(error instanceof Error ? error.message : 'Campaign cancellation failed');
+    } finally {
+      setCancellingCampaignId(null);
+    }
+  }
+
   function updateSender(senderId: string) {
     const nextSender = senders.find((sender) => sender.id === senderId);
     setSelectedSenderId(senderId);
@@ -572,7 +604,7 @@ export function OutreachApp() {
 
         {activeTab === 'campaign' && (
           <section className="tabPane tabPaneWide">
-            <HistoryPanel campaigns={campaigns} loading={campaignsLoading} error={campaignsError} onRetry={retryFailedCampaign} retryingCampaignId={retryingCampaignId} />
+            <HistoryPanel campaigns={campaigns} loading={campaignsLoading} error={campaignsError} onRetry={retryFailedCampaign} retryingCampaignId={retryingCampaignId} onCancel={cancelCampaign} cancellingCampaignId={cancellingCampaignId} />
           </section>
         )}
 

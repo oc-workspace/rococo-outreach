@@ -28,6 +28,7 @@ type CampaignRecordRow = {
   totalCount: number;
   successCount: number;
   failedCount: number;
+  cancelledCount: number;
   repliedCount: number;
   status: string;
   createdAt: Date;
@@ -36,12 +37,12 @@ type CampaignRecordRow = {
 };
 
 function toDeliveryStatus(status: string): DeliveryRecord['sendStatus'] {
-  if (status === 'sending' || status === 'sent' || status === 'failed' || status === 'bounced' || status === 'replied') return status;
+  if (status === 'sending' || status === 'sent' || status === 'failed' || status === 'bounced' || status === 'replied' || status === 'cancelled') return status;
   return 'pending';
 }
 
 function toCampaignStatus(status: string): CampaignRecord['status'] {
-  if (status === 'previewed' || status === 'sending' || status === 'sent' || status === 'partial_failed' || status === 'cancelled') return status;
+  if (status === 'previewed' || status === 'queued' || status === 'sending' || status === 'paused' || status === 'sent' || status === 'partial_failed' || status === 'cancelled') return status;
   return 'draft';
 }
 
@@ -57,6 +58,7 @@ export function toCampaignRecord(row: CampaignRecordRow): CampaignRecord {
     totalCount: row.totalCount,
     successCount: row.successCount,
     failedCount: row.failedCount,
+    cancelledCount: row.cancelledCount,
     repliedCount: row.repliedCount,
     status: toCampaignStatus(row.status),
     createdAt: row.createdAt.toISOString(),

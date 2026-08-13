@@ -1,7 +1,7 @@
 export type ContactStatus = 'active' | 'inactive' | 'blocked';
 export type LanguageCode = 'zh' | 'en' | 'ja' | string;
-export type CampaignStatus = 'draft' | 'previewed' | 'sending' | 'sent' | 'partial_failed' | 'cancelled';
-export type DeliveryStatus = 'pending' | 'sending' | 'sent' | 'failed' | 'bounced' | 'replied';
+export type CampaignStatus = 'draft' | 'previewed' | 'queued' | 'sending' | 'paused' | 'sent' | 'partial_failed' | 'cancelled';
+export type DeliveryStatus = 'pending' | 'sending' | 'sent' | 'failed' | 'bounced' | 'replied' | 'cancelled';
 export type SenderStatus = 'active' | 'inactive' | 'disabled';
 
 export interface EmailContact {
@@ -100,6 +100,7 @@ export interface CampaignRecord {
   totalCount: number;
   successCount: number;
   failedCount: number;
+  cancelledCount: number;
   repliedCount: number;
   status: CampaignStatus;
   createdAt: string;

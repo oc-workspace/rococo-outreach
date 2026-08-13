@@ -1,9 +1,10 @@
 import { prisma } from '@/lib/db/prisma';
-import { createTencentEnterpriseMailTransport, readTencentEnterpriseMailConfig } from '@/lib/mail/transportFactory';
+import { readTencentEnterpriseMailConfig } from '@/lib/mail/transportFactory';
 import type { MailTransport } from '@/lib/mail/transport';
 import type { RenderedEmail } from './types';
 import { htmlToText } from './render';
 import { sanitizeEmailHtml } from './htmlSafety';
+import { finalizeCampaign, wakeCampaignQueueWorker } from './queueWorker';
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const maxRecipients = 50;
@@ -21,6 +22,7 @@ export interface SendCampaignInput {
 
 export interface CampaignSendOptions {
   transport?: MailTransport;
+  simulationFailureRecipient?: string;
 }
 
 export function isValidIdempotencyKey(value: string): boolean {
@@ -93,10 +95,8 @@ export async function sendAndPersistCampaign(input: SendCampaignInput, idempoten
     seen.add(delivery.toEmail);
   }
 
-  const transport = options.transport ?? createTencentEnterpriseMailTransport();
-  let campaign;
   try {
-    campaign = await prisma.emailCampaign.create({
+    const campaign = await prisma.emailCampaign.create({
       data: {
         idempotencyKey,
         name,
@@ -107,11 +107,14 @@ export async function sendAndPersistCampaign(input: SendCampaignInput, idempoten
         senderName,
         replyToEmail,
         totalCount: normalizedDeliveries.length,
-        status: 'sending',
+        status: 'queued',
+        simulationFailureRecipient: options.simulationFailureRecipient?.trim().toLowerCase() || null,
         deliveries: { create: normalizedDeliveries },
       },
       include: { deliveries: { orderBy: { createdAt: 'asc' } } },
     });
+    wakeCampaignQueueWorker(prisma);
+    return campaign;
   } catch (error) {
     if (!isUniqueConstraintError(error)) throw error;
     const concurrentCampaign = await prisma.emailCampaign.findUnique({
@@ -121,56 +124,27 @@ export async function sendAndPersistCampaign(input: SendCampaignInput, idempoten
     if (concurrentCampaign) return concurrentCampaign;
     throw error;
   }
-
-  let successCount = 0;
-  let failedCount = 0;
-  for (const delivery of campaign.deliveries) {
-    await prisma.emailCampaignDelivery.update({ where: { id: delivery.id }, data: { sendStatus: 'sending', attemptCount: { increment: 1 }, lastAttemptAt: new Date() } });
-    try {
-      const result = await transport.send({
-        from: senderEmail,
-        replyTo: replyToEmail,
-        to: delivery.toEmail,
-        subject: delivery.renderedSubject,
-        html: delivery.renderedBodyHtml,
-        text: delivery.renderedBodyText,
-      });
-      const accepted = result.accepted.some((value) => value.trim().toLowerCase() === delivery.toEmail) && result.rejected.length === 0;
-      if (!accepted) {
-        failedCount += 1;
-        await prisma.emailCampaignDelivery.update({ where: { id: delivery.id }, data: { sendStatus: 'failed', errorMessage: 'SMTP rejected recipient' } });
-        continue;
-      }
-      successCount += 1;
-      await prisma.emailCampaignDelivery.update({ where: { id: delivery.id }, data: { sendStatus: 'sent', providerMessageId: result.messageId, sentAt: new Date() } });
-    } catch (error) {
-      failedCount += 1;
-      await prisma.emailCampaignDelivery.update({ where: { id: delivery.id }, data: { sendStatus: 'failed', errorMessage: safeSendError(error) } });
-    }
-  }
-
-  return prisma.emailCampaign.update({
-    where: { id: campaign.id },
-    data: { successCount, failedCount, status: failedCount > 0 ? 'partial_failed' : 'sent', sentAt: new Date() },
-    include: { deliveries: { orderBy: { createdAt: 'asc' } } },
-  });
 }
 
-export async function retryFailedCampaign(campaignId: string, idempotencyKey: string, options: CampaignSendOptions = {}) {
+export async function retryFailedCampaign(campaignId: string, idempotencyKey: string, _options: CampaignSendOptions = {}) {
   if (!isValidIdempotencyKey(idempotencyKey)) throw new CampaignSendError(400, 'A valid Idempotency-Key header is required');
 
   const existingRetry = await prisma.emailCampaignRetry.findUnique({
     where: { idempotencyKey },
     include: { campaign: { include: { deliveries: { orderBy: { createdAt: 'asc' } } } } },
   });
-  if (existingRetry) return existingRetry.campaign;
+  if (existingRetry) {
+    return prisma.emailCampaign.findUniqueOrThrow({
+      where: { id: existingRetry.campaignId },
+      include: { deliveries: { orderBy: { createdAt: 'asc' } } },
+    });
+  }
 
   const campaign = await prisma.emailCampaign.findUnique({
     where: { id: campaignId },
     include: { deliveries: { orderBy: { createdAt: 'asc' } } },
   });
   if (!campaign) throw new CampaignSendError(404, 'Campaign not found');
-
   const failedDeliveries = campaign.deliveries.filter((delivery) => delivery.sendStatus === 'failed');
   if (failedDeliveries.length === 0) return campaign;
 
@@ -186,7 +160,7 @@ export async function retryFailedCampaign(campaignId: string, idempotencyKey: st
   let retryRequest;
   try {
     retryRequest = await prisma.emailCampaignRetry.create({
-      data: { campaignId: campaign.id, idempotencyKey, status: 'sending' },
+      data: { campaignId: campaign.id, idempotencyKey, status: 'queued' },
     });
   } catch (error) {
     if (!isUniqueConstraintError(error)) throw error;
@@ -194,64 +168,30 @@ export async function retryFailedCampaign(campaignId: string, idempotencyKey: st
       where: { idempotencyKey },
       include: { campaign: { include: { deliveries: { orderBy: { createdAt: 'asc' } } } } },
     });
-    if (concurrentRetry) return concurrentRetry.campaign;
+    if (concurrentRetry) return prisma.emailCampaign.findUniqueOrThrow({
+      where: { id: concurrentRetry.campaignId },
+      include: { deliveries: { orderBy: { createdAt: 'asc' } } },
+    });
     throw error;
   }
 
-  const transport = options.transport ?? createTencentEnterpriseMailTransport();
-  for (const delivery of failedDeliveries) {
-    const claim = await prisma.emailCampaignDelivery.updateMany({
-      where: { id: delivery.id, sendStatus: 'failed' },
-      data: { sendStatus: 'sending', attemptCount: { increment: 1 }, lastAttemptAt: new Date() },
-    });
-    if (claim.count === 0) continue;
-
-    try {
-      const result = await transport.send({
-        from: campaign.senderEmail,
-        replyTo: campaign.replyToEmail,
-        to: delivery.toEmail,
-        subject: delivery.renderedSubject,
-        html: delivery.renderedBodyHtml,
-        text: delivery.renderedBodyText,
-      });
-      const accepted = result.accepted.some((value) => value.trim().toLowerCase() === delivery.toEmail) && result.rejected.length === 0;
-      if (accepted) {
-        await prisma.emailCampaignDelivery.update({ where: { id: delivery.id }, data: { sendStatus: 'sent', providerMessageId: result.messageId, errorMessage: null, sentAt: new Date() } });
-      } else {
-        await prisma.emailCampaignDelivery.update({ where: { id: delivery.id }, data: { sendStatus: 'failed', errorMessage: 'SMTP rejected recipient' } });
-      }
-    } catch (error) {
-      await prisma.emailCampaignDelivery.update({ where: { id: delivery.id }, data: { sendStatus: 'failed', errorMessage: safeSendError(error) } });
-    }
-  }
-
-  const latest = await prisma.emailCampaign.findUnique({
+  await prisma.emailCampaignDelivery.updateMany({
+    where: { id: { in: failedDeliveries.map((delivery) => delivery.id) }, sendStatus: 'failed' },
+    data: { sendStatus: 'pending', errorMessage: null },
+  });
+  const queued = await prisma.emailCampaign.update({
     where: { id: campaign.id },
+    data: { status: 'queued', sentAt: null, simulationFailureRecipient: null },
     include: { deliveries: { orderBy: { createdAt: 'asc' } } },
   });
-  if (!latest) throw new CampaignSendError(404, 'Campaign not found');
-  const successCount = latest.deliveries.filter((delivery) => delivery.sendStatus === 'sent').length;
-  const failedCount = latest.deliveries.filter((delivery) => delivery.sendStatus === 'failed').length;
-  const updated = await prisma.emailCampaign.update({
-    where: { id: campaign.id },
-    data: { successCount, failedCount, status: failedCount > 0 ? 'partial_failed' : 'sent', sentAt: new Date() },
+  wakeCampaignQueueWorker(prisma);
+  void retryRequest;
+  return finalizeCampaign(prisma, queued.id).then(() => prisma.emailCampaign.findUniqueOrThrow({
+    where: { id: queued.id },
     include: { deliveries: { orderBy: { createdAt: 'asc' } } },
-  });
-  await prisma.emailCampaignRetry.update({ where: { id: retryRequest.id }, data: { status: 'completed', completedAt: new Date() } });
-  return updated;
+  }));
 }
 
 function isUniqueConstraintError(error: unknown): boolean {
   return Boolean(error && typeof error === 'object' && (error as { code?: unknown }).code === 'P2002');
-}
-
-function safeSendError(error: unknown): string {
-  if (!error || typeof error !== 'object') return 'SMTP send failed';
-  const value = error as { code?: unknown; command?: unknown };
-  const code = typeof value.code === 'string' && /^[A-Za-z0-9_-]{1,40}$/.test(value.code) ? value.code : '';
-  const command = typeof value.command === 'string' && /^[A-Za-z0-9_-]{1,40}$/.test(value.command) ? value.command : '';
-  if (code && command) return `SMTP send failed (${code}/${command})`;
-  if (code) return `SMTP send failed (${code})`;
-  return 'SMTP send failed';
 }

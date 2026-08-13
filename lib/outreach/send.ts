@@ -25,6 +25,7 @@ export function sendCampaignOneByOne(params: { name: string; draft: EmailDraft; 
     totalCount: deliveries.length,
     successCount,
     failedCount,
+    cancelledCount: 0,
     repliedCount: 0,
     status: failedCount > 0 ? 'partial_failed' : 'sent',
     createdAt: now,

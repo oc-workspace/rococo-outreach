@@ -282,6 +282,12 @@ This version adds operational and growth controls:
 - Queue system.
 - Permissions and audit logs.
 
+Current status as of 2026-08-13: Campaign pacing, a PostgreSQL-backed queue,
+stale-delivery recovery, failed-delivery requeue, and stopping unsent
+deliveries are implemented for the current single development mailbox. Reply,
+bounce, unsubscribe, open/click tracking, permissions, and audit logs remain
+incomplete.
+
 ## 9. Architecture Development Slices
 
 ### Slice 1: Frontend Safe MVP
@@ -326,8 +332,8 @@ Completed for the current single development mailbox, with operational limits:
 - Provider message IDs and safe provider errors are stored on delivery records.
 - Controlled test and Campaign sends verified `From`, `Reply-To`, recipient
   delivery, and Tencent Sent-folder visibility.
-- Large-volume sending remains out of scope until pacing/rate limits, a durable
-  queue, stop controls, and auditability are implemented.
+- Large-volume sending remains out of scope until multi-mailbox operational
+  controls, auditability, and production deployment verification are complete.
 
 ## 10. Recommended Implementation Phases
 
@@ -362,7 +368,8 @@ Completed for the current single development mailbox, with operational limits:
 - Unsubscribe handling.
 - Open/click tracking if needed.
 - Scheduled sending.
-- Rate limits and send queue.
+- Sender-level rate limits, a durable Campaign send queue, startup recovery, and
+  stop controls for unsent deliveries.
 - Audit log.
 
 ## 11. Sending Provider Recommendation

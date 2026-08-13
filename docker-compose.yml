@@ -11,6 +11,7 @@ services:
       NODE_ENV: production
       PORT: 3000
       HOSTNAME: 0.0.0.0
+      OUTREACH_QUEUE_WORKER: "true"
     ports:
       - "${HOST_PORT:-3107}:3000"
     depends_on:
