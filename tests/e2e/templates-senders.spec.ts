@@ -22,6 +22,14 @@ test('selects senders and recovers to a valid default after reload', async ({ pa
   await expect(page.getByText('Verified', { exact: true })).toBeVisible();
 });
 
+test('exposes only senders from the configured allowed domain', async ({ page }) => {
+  const response = await page.request.get('/api/senders');
+  expect(response.status()).toBe(200);
+  const senders = (await response.json()).data as Array<{ email: string }>;
+  expect(senders.map((sender) => sender.email)).toEqual(['winnie@next2p.com', 'zeta@next2p.com']);
+  expect(senders.some((sender) => sender.email === 'disabled@example.test')).toBe(false);
+});
+
 test('persists and reapplies a reusable template after refresh', async ({ page }) => {
   await page.getByLabel('Subject').fill('Persistent template subject');
   await page.getByLabel('Email body editor').fill('Persistent template body');

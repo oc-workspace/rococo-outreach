@@ -285,8 +285,10 @@ This version adds operational and growth controls:
 Current status as of 2026-08-13: Campaign pacing, a PostgreSQL-backed queue,
 stale-delivery recovery, failed-delivery requeue, and stopping unsent
 deliveries are implemented for the current single development mailbox. Reply,
-bounce, unsubscribe, open/click tracking, permissions, and audit logs remain
-incomplete.
+bounce, unsubscribe, open/click tracking, and permissions remain incomplete.
+Audit logs and the read-only queue observability endpoints are implemented for
+the current single development mailbox. The sender domain policy currently
+allows only `next2p.com`, while multi-mailbox authorization remains future work.
 
 ## 9. Architecture Development Slices
 
@@ -370,7 +372,7 @@ Completed for the current single development mailbox, with operational limits:
 - Scheduled sending.
 - Sender-level rate limits, a durable Campaign send queue, startup recovery, and
   stop controls for unsent deliveries.
-- Audit log.
+- [x] Audit log and read-only queue observability for the single development mailbox.
 
 ## 11. Sending Provider Recommendation
 

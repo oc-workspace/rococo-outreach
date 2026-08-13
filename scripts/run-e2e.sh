@@ -53,6 +53,7 @@ export TENCENT_MAIL_SMTP_SECURE=true
 export TENCENT_MAIL_SMTP_USER=winnie@next2p.com
 export TENCENT_MAIL_SMTP_PASSWORD=e2e-not-a-real-password
 export TEST_RECIPIENT_EMAIL=operator@example.test
+export OUTREACH_ALLOWED_SENDER_DOMAINS=next2p.com
 
 cd "$repo_dir"
 ./node_modules/.bin/prisma migrate deploy

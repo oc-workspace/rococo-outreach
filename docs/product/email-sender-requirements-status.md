@@ -23,7 +23,13 @@ Example target shape:
 - Allowed sender 1: `employee1@pp.com`
 - Allowed sender 2: `employee2@pp.com`
 
-If the sender address is `employee1@qq.com`, then the sender domain is `qq.com`, not `pp.com`. That can still be supported later, but it is a different verification and ownership model. The product should decide whether senders must use the team's verified domain or whether external mailbox domains are also allowed.
+Current internal-workspace policy: sender addresses must use the exact
+`next2p.com` domain. The domain allowlist is configuration-backed so additional
+verified domains can be added later without changing the sender data model.
+The allowlist is only a first gate; active status, domain/sender verification,
+SMTP mailbox matching, and future workspace permissions remain authoritative.
+
+If the sender address is `employee1@qq.com`, then the sender domain is `qq.com`, not `pp.com`. External mailbox domains remain a future verification and ownership model; the current internal workspace only allows `next2p.com`.
 
 ## Frontend Decision
 

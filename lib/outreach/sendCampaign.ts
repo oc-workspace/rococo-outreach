@@ -6,6 +6,7 @@ import { htmlToText } from './render';
 import { sanitizeEmailHtml } from './htmlSafety';
 import { finalizeCampaign, wakeCampaignQueueWorker } from './queueWorker';
 import { writeCampaignAudit } from './audit';
+import { isAllowedSenderEmail } from './senderPolicy';
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const maxRecipients = 50;
@@ -59,9 +60,11 @@ export async function sendAndPersistCampaign(input: SendCampaignInput, idempoten
   if (sender.status !== 'active' || !sender.domainVerified || !sender.senderVerified) {
     throw new CampaignSendError(409, 'Selected sender is not eligible for sending');
   }
+  if (!isAllowedSenderEmail(sender.email)) throw new CampaignSendError(409, 'Selected sender domain is not allowed');
 
   const config = readTencentEnterpriseMailConfig();
   const senderEmail = input.senderEmail.trim().toLowerCase();
+  if (!isAllowedSenderEmail(senderEmail)) throw new CampaignSendError(409, 'Selected sender domain is not allowed');
   const configuredMailbox = config.user.trim().toLowerCase();
   if (sender.email.trim().toLowerCase() !== senderEmail || senderEmail !== configuredMailbox) {
     throw new CampaignSendError(409, 'Selected sender does not match the connected SMTP mailbox');
@@ -154,6 +157,7 @@ export async function retryFailedCampaign(campaignId: string, idempotencyKey: st
   if (!sender || sender.status !== 'active' || !sender.domainVerified || !sender.senderVerified) {
     throw new CampaignSendError(409, 'Campaign sender is not eligible for retry');
   }
+  if (!isAllowedSenderEmail(sender.email) || !isAllowedSenderEmail(campaign.senderEmail)) throw new CampaignSendError(409, 'Campaign sender domain is not allowed');
   const config = readTencentEnterpriseMailConfig();
   if (sender.email.trim().toLowerCase() !== config.user.trim().toLowerCase() || campaign.senderEmail.trim().toLowerCase() !== config.user.trim().toLowerCase()) {
     throw new CampaignSendError(409, 'Campaign sender does not match the connected SMTP mailbox');

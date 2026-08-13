@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createTencentEnterpriseMailTransport, readTencentEnterpriseMailConfig } from '@/lib/mail/transportFactory';
 import { authorizeDevOutreachToken } from '@/lib/outreach/apiAuth';
+import { isAllowedSenderEmail } from '@/lib/outreach/senderPolicy';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,6 +38,10 @@ export async function PUT(request: Request) {
 
   try {
     const transport = createTencentEnterpriseMailTransport();
+    const config = readTencentEnterpriseMailConfig();
+    if (!isAllowedSenderEmail(config.user)) {
+      return privateJson({ error: 'Configured SMTP mailbox domain is not allowed' }, { status: 409 });
+    }
     await transport.verify();
 
     return privateJson({
@@ -66,6 +71,9 @@ export async function POST(request: Request) {
 
   try {
     const config = readTencentEnterpriseMailConfig();
+    if (!isAllowedSenderEmail(config.user)) {
+      return privateJson({ error: 'Configured SMTP mailbox domain is not allowed' }, { status: 409 });
+    }
     const subject = `Rococo Outreach SMTP Test ${new Date().toISOString()}`;
     const transport = createTencentEnterpriseMailTransport();
     const result = await transport.send({
@@ -117,7 +125,7 @@ function readReadiness() {
 
   if (configurationValid) {
     try {
-      readTencentEnterpriseMailConfig();
+      configurationValid = isAllowedSenderEmail(readTencentEnterpriseMailConfig().user);
     } catch {
       configurationValid = false;
     }
