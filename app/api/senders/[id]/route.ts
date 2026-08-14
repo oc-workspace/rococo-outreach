@@ -1,19 +1,18 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
-import { authorizeDevOutreachToken } from '@/lib/outreach/apiAuth';
 import { isMailboxAccountReady } from '@/lib/outreach/mailboxAccounts';
 import { toEmailSender } from '@/lib/outreach/senders';
-import { getOutreachTeamKey, getOutreachWorkspaceKey } from '@/lib/outreach/workspaceScope';
+import { isOutreachPrincipal, requireOutreachPermission, type OutreachPrincipal } from '@/lib/outreach/permissions';
 
 export const dynamic = 'force-dynamic';
 
 const editableStatuses = new Set(['active', 'inactive', 'disabled']);
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
-  const accessFailure = await authorizeDevOutreachToken(request);
-  if (accessFailure) return accessFailure;
+  const access = await requireOutreachPermission(request, 'sender:write');
+  if (!isOutreachPrincipal(access)) return access;
 
-  const sender = await findSender(params.id);
+  const sender = await findSender(params.id, access);
   if (!sender) return privateJson({ error: 'Sender not found.' }, { status: 404 });
   const body = await request.json().catch(() => null) as Record<string, unknown> | null;
   const data: { displayName?: string; status?: string } = {};
@@ -44,10 +43,10 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 }
 
 export async function DELETE(request: Request, { params }: { params: { id: string } }) {
-  const accessFailure = await authorizeDevOutreachToken(request);
-  if (accessFailure) return accessFailure;
+  const access = await requireOutreachPermission(request, 'sender:write');
+  if (!isOutreachPrincipal(access)) return access;
 
-  const sender = await findSender(params.id);
+  const sender = await findSender(params.id, access);
   if (!sender) return privateJson({ error: 'Sender not found.' }, { status: 404 });
   const updated = await prisma.emailSender.update({
     where: { id: sender.id },
@@ -57,9 +56,9 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
   return privateJson({ data: toEmailSender(updated) });
 }
 
-async function findSender(id: string) {
+async function findSender(id: string, principal: OutreachPrincipal) {
   return prisma.emailSender.findFirst({
-    where: { id, workspaceKey: getOutreachWorkspaceKey(), teamKey: getOutreachTeamKey() },
+    where: { id, workspaceKey: principal.workspaceKey, teamKey: principal.teamKey },
     include: { mailboxAccount: true },
   });
 }

@@ -72,6 +72,14 @@ export interface EmailSender {
     status: string;
     verificationStatus: string;
   } | null;
+  domainVerification?: {
+    domain: string;
+    status: string;
+    method: string;
+    lastCheckedAt?: string | null;
+    verifiedAt?: string | null;
+    failureReason?: string | null;
+  } | null;
   createdAt: string;
   updatedAt: string;
 }

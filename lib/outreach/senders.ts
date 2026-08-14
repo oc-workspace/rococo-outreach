@@ -18,6 +18,14 @@ export function toEmailSender(sender: {
     status: string;
     verificationStatus: string;
   } | null;
+  domainVerification?: {
+    domain: string;
+    status: string;
+    method: string;
+    lastCheckedAt: Date | null;
+    verifiedAt: Date | null;
+    failureReason: string | null;
+  } | null;
   createdAt: Date;
   updatedAt: Date;
 }): EmailSender {
@@ -36,6 +44,14 @@ export function toEmailSender(sender: {
       mailboxEmail: sender.mailboxAccount.mailboxEmail,
       status: sender.mailboxAccount.status,
       verificationStatus: sender.mailboxAccount.verificationStatus,
+    } : null,
+    domainVerification: sender.domainVerification ? {
+      domain: sender.domainVerification.domain,
+      status: sender.domainVerification.status,
+      method: sender.domainVerification.method,
+      lastCheckedAt: sender.domainVerification.lastCheckedAt?.toISOString() ?? null,
+      verifiedAt: sender.domainVerification.verifiedAt?.toISOString() ?? null,
+      failureReason: sender.domainVerification.failureReason,
     } : null,
     createdAt: sender.createdAt.toISOString(),
     updatedAt: sender.updatedAt.toISOString(),

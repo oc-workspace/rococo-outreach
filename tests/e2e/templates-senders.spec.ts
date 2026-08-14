@@ -41,6 +41,12 @@ test('manages sender records inside the current workspace scope', async ({ page 
   expect(managementSenders.map((sender) => sender.email).sort()).toEqual(['orphan@next2p.com', 'winnie@next2p.com', 'zeta@next2p.com']);
   expect(managementSenders.every((sender) => sender.workspaceKey === 'default' && sender.teamKey === 'outreach')).toBe(true);
 
+  const verificationResponse = await page.request.post('/api/senders/smtp-winnie-next2p/verification');
+  expect(verificationResponse.status()).toBe(201);
+  const verification = (await verificationResponse.json()).data as { status: string; record: { name: string; type: string; value: string } };
+  expect(verification.status).toBe('pending');
+  expect(verification.record).toMatchObject({ name: '_rococo-outreach.next2p.com', type: 'TXT' });
+
   await page.getByLabel('Display name', { exact: true }).fill('Pending UI Sender');
   await page.getByLabel('Sender email', { exact: true }).fill('pending-ui@next2p.com');
   await page.getByRole('button', { name: 'Add sender' }).click();

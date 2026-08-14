@@ -3,34 +3,38 @@ import { prisma } from '@/lib/db/prisma';
 import { toEmailSender } from '@/lib/outreach/senders';
 import { isMailboxAccountReady } from '@/lib/outreach/mailboxAccounts';
 import { isAllowedSenderEmail } from '@/lib/outreach/senderPolicy';
-import { authorizeDevOutreachToken } from '@/lib/outreach/apiAuth';
 import { getEmailDomain } from '@/lib/outreach/senderPolicy';
-import { getOutreachTeamKey, getOutreachWorkspaceKey } from '@/lib/outreach/workspaceScope';
+import { isOutreachPrincipal, requireOutreachPermission } from '@/lib/outreach/permissions';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
-  const accessFailure = await authorizeDevOutreachToken(request);
-  if (accessFailure) return accessFailure;
+  const access = await requireOutreachPermission(request, 'sender:read');
+  if (!isOutreachPrincipal(access)) return access;
 
   const management = new URL(request.url).searchParams.get('management') === 'true';
   const senders = await prisma.emailSender.findMany({
-    where: { workspaceKey: getOutreachWorkspaceKey(), teamKey: getOutreachTeamKey() },
+    where: { workspaceKey: access.workspaceKey, teamKey: access.teamKey },
     orderBy: [{ status: 'asc' }, { email: 'asc' }],
     include: { mailboxAccount: true },
   });
+  const domainVerifications = await prisma.emailDomainVerification.findMany({ where: { workspaceKey: access.workspaceKey, teamKey: access.teamKey } });
+  const domainVerificationByDomain = new Map(domainVerifications.map((verification) => [verification.domain, verification]));
 
   const allowedSenders = senders.filter((sender) => isAllowedSenderEmail(sender.email));
   const visibleSenders = management
     ? allowedSenders
     : allowedSenders.filter((sender) => sender.status === 'active' && sender.domainVerified && sender.senderVerified && isMailboxAccountReady(sender.mailboxAccount));
 
-  return privateJson({ data: visibleSenders.map(toEmailSender) });
+  return privateJson({
+    data: visibleSenders.map((sender) => toEmailSender({ ...sender, domainVerification: domainVerificationByDomain.get(sender.domain) ?? null })),
+    meta: { workspaceKey: access.workspaceKey, teamKey: access.teamKey, role: access.role },
+  });
 }
 
 export async function POST(request: Request) {
-  const accessFailure = await authorizeDevOutreachToken(request);
-  if (accessFailure) return accessFailure;
+  const access = await requireOutreachPermission(request, 'sender:write');
+  if (!isOutreachPrincipal(access)) return access;
 
   const body = await request.json().catch(() => null) as Record<string, unknown> | null;
   const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
@@ -44,7 +48,7 @@ export async function POST(request: Request) {
     return privateJson({ error: 'mailboxAccountId must be a string when provided.' }, { status: 400 });
   }
 
-  const workspaceKey = getOutreachWorkspaceKey();
+  const workspaceKey = access.workspaceKey;
   const mailboxAccountId = typeof body?.mailboxAccountId === 'string' ? body.mailboxAccountId.trim() : '';
   let mailboxAccount = null;
   if (mailboxAccountId) {
@@ -61,7 +65,7 @@ export async function POST(request: Request) {
         displayName,
         email,
         workspaceKey,
-        teamKey: getOutreachTeamKey(),
+        teamKey: access.teamKey,
         domain,
         domainVerified: false,
         senderVerified: false,

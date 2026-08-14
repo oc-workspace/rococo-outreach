@@ -133,11 +133,12 @@ Implemented frontend boundaries:
 - [x] Current product rule: allow only sender addresses ending in `@next2p.com`; the rule remains extensible for future workspace-specific domains.
 - [x] Added an authenticated sender management UI for creating, editing, and disabling sender records; deletion is intentionally soft-disable to preserve campaign history.
 - [x] Added authenticated sender management GET/POST/PATCH/DELETE APIs with internal-domain and mailbox-account safety gates.
-- [x] Added sender workspace/team scope fields; the current operator is restricted to the configured internal `default/outreach` scope while role-based identities remain future work.
-- [ ] Add a real domain and sender verification workflow, including provider/DNS status if needed.
+- [x] Added sender workspace/team scope fields and persisted workspace/team/member roles; the current shared operator token maps to the seeded `operator` owner membership.
+- [x] Added a DNS TXT request and public DNS check workflow with persisted verification status and failure details.
+- [ ] Connect provider-specific sender verification and external identity/SSO confirmation when credentials are available.
 - [x] Added the persistent mailbox-account foundation for the current development mailbox, including sender binding, active/verified gates, and SMTP identity matching.
 - [ ] Replace the current environment-configured SMTP credential with a secret-reference mechanism; do not persist SMTP passwords in the database or audit log.
-- [ ] Replace the current shared operator credential with workspace/team identities and role-based authorization before the internal tool needs multiple access levels.
+- [x] Added persisted workspace/team/member/role records and sender permission gates; the shared operator token currently maps to the seeded `operator` owner member.
 - [x] Added sender-level campaign pacing, a durable Campaign send queue,
   startup recovery, failed-delivery requeue, and a way to stop deliveries that
   have not started. This is currently implemented for the single development

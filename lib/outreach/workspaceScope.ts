@@ -8,6 +8,10 @@ export function getOutreachTeamKey(rawValue = process.env.OUTREACH_TEAM_KEY): st
   return normalizeScopeKey(rawValue) ?? 'outreach';
 }
 
+export function getOutreachActorKey(rawValue = process.env.OUTREACH_OPERATOR_KEY): string {
+  return normalizeScopeKey(rawValue) ?? 'operator';
+}
+
 export function normalizeScopeKey(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   const normalized = value.trim().toLowerCase();

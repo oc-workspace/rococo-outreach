@@ -41,6 +41,8 @@ model EmailSender {
   mailboxAccountId String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+  workspace       OutreachWorkspace @relation(fields: [workspaceKey], references: [key], onDelete: Restrict)
+  team            OutreachTeam @relation(fields: [workspaceKey, teamKey], references: [workspaceKey, key], onDelete: Restrict)
   mailboxAccount  EmailMailboxAccount? @relation(fields: [mailboxAccountId], references: [id], onDelete: SetNull)
 
   @@index([domain])
@@ -48,6 +50,71 @@ model EmailSender {
   @@index([status])
   @@index([mailboxAccountId])
   @@map("email_senders")
+}
+
+model OutreachWorkspace {
+  key         String   @id
+  name        String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  teams       OutreachTeam[]
+  members     OutreachMember[]
+  senders     EmailSender[]
+
+  @@map("outreach_workspaces")
+}
+
+model OutreachTeam {
+  id           String   @id @default(cuid())
+  workspaceKey String
+  key          String
+  name         String   @default("")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  workspace    OutreachWorkspace @relation(fields: [workspaceKey], references: [key], onDelete: Cascade)
+  members      OutreachMember[]
+  senders      EmailSender[]
+
+  @@unique([workspaceKey, key])
+  @@index([workspaceKey])
+  @@map("outreach_teams")
+}
+
+model OutreachMember {
+  id           String   @id @default(cuid())
+  workspaceKey String
+  teamKey      String
+  actorKey     String
+  role         String   @default("viewer")
+  status       String   @default("active")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  workspace    OutreachWorkspace @relation(fields: [workspaceKey], references: [key], onDelete: Cascade)
+  team         OutreachTeam @relation(fields: [workspaceKey, teamKey], references: [workspaceKey, key], onDelete: Cascade)
+
+  @@unique([workspaceKey, teamKey, actorKey])
+  @@index([actorKey, status])
+  @@map("outreach_members")
+}
+
+model EmailDomainVerification {
+  id            String   @id @default(cuid())
+  workspaceKey  String
+  teamKey       String
+  domain        String
+  method        String   @default("dns_txt")
+  status        String   @default("unverified")
+  token         String
+  requestedAt   DateTime?
+  lastCheckedAt DateTime?
+  verifiedAt    DateTime?
+  failureReason String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([workspaceKey, teamKey, domain])
+  @@index([workspaceKey, teamKey, status])
+  @@map("email_domain_verifications")
 }
 
 model EmailMailboxAccount {
