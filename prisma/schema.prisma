@@ -32,6 +32,8 @@ model EmailSender {
   id              String   @id @default(cuid())
   displayName     String   @default("")
   email           String   @unique
+  workspaceKey    String   @default("default")
+  teamKey         String   @default("outreach")
   domain          String   @default("")
   domainVerified  Boolean  @default(false)
   senderVerified  Boolean  @default(false)
@@ -42,6 +44,7 @@ model EmailSender {
   mailboxAccount  EmailMailboxAccount? @relation(fields: [mailboxAccountId], references: [id], onDelete: SetNull)
 
   @@index([domain])
+  @@index([workspaceKey, teamKey])
   @@index([status])
   @@index([mailboxAccountId])
   @@map("email_senders")

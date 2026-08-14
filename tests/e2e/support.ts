@@ -46,6 +46,6 @@ export async function login(page: Page) {
   await expect(page.getByText('4 contacts', { exact: true })).toBeVisible();
 }
 
-export async function openTab(page: Page, name: 'Contacts' | 'Campaign' | 'Compose') {
+export async function openTab(page: Page, name: 'Contacts' | 'Campaign' | 'Compose' | 'Senders') {
   await page.getByRole('button', { name: new RegExp(`^${name}`) }).click();
 }

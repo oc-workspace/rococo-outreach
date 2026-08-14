@@ -60,10 +60,18 @@ export interface EmailSender {
   id: string;
   displayName: string;
   email: string;
+  workspaceKey?: string;
+  teamKey?: string;
   domain: string;
   domainVerified: boolean;
   senderVerified: boolean;
   status: SenderStatus;
+  mailboxAccountId?: string | null;
+  mailboxAccount?: {
+    mailboxEmail: string;
+    status: string;
+    verificationStatus: string;
+  } | null;
   createdAt: string;
   updatedAt: string;
 }

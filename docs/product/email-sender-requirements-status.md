@@ -131,9 +131,9 @@ Implemented frontend boundaries:
 ## Not Done Yet
 
 - [x] Current product rule: allow only sender addresses ending in `@next2p.com`; the rule remains extensible for future workspace-specific domains.
-- [ ] Add a real sender management UI for creating, editing, disabling, or deleting senders.
-- [ ] Add write APIs for sender management, if the product wants sender management inside this app.
-- [ ] Add workspace/team ownership and permissions for sender records.
+- [x] Added an authenticated sender management UI for creating, editing, and disabling sender records; deletion is intentionally soft-disable to preserve campaign history.
+- [x] Added authenticated sender management GET/POST/PATCH/DELETE APIs with internal-domain and mailbox-account safety gates.
+- [x] Added sender workspace/team scope fields; the current operator is restricted to the configured internal `default/outreach` scope while role-based identities remain future work.
 - [ ] Add a real domain and sender verification workflow, including provider/DNS status if needed.
 - [x] Added the persistent mailbox-account foundation for the current development mailbox, including sender binding, active/verified gates, and SMTP identity matching.
 - [ ] Replace the current environment-configured SMTP credential with a secret-reference mechanism; do not persist SMTP passwords in the database or audit log.

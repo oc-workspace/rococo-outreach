@@ -7,6 +7,7 @@ import { HistoryPanel } from './HistoryPanel';
 import { PreviewPanel } from './PreviewPanel';
 import { RecipientRows } from './RecipientRows';
 import { SenderSettings } from './SenderSettings';
+import { SenderManagement } from './SenderManagement';
 import { LogoutButton } from './LogoutButton';
 import { initialDraft, initialRecipients } from '@/lib/outreach/seed';
 import { hasDuplicateRecipients, renderRecipientEmail } from '@/lib/outreach/render';
@@ -14,7 +15,7 @@ import { validateCampaignSend } from '@/lib/outreach/validation';
 import type { CampaignDraftRecord, CampaignQueueSnapshot, CampaignRecord, ContactStatus, EmailContact, EmailDraft, EmailSender, EmailTemplateRecord, RecipientRow } from '@/lib/outreach/types';
 import type { SendValidationError, SendValidationMode } from '@/lib/outreach/validation';
 
-type WorkspaceTab = 'contacts' | 'campaign' | 'compose';
+type WorkspaceTab = 'contacts' | 'campaign' | 'compose' | 'senders';
 
 function newId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -576,6 +577,7 @@ export function OutreachApp() {
     { id: 'contacts', label: 'Contacts', meta: contactsLoading ? 'loading' : String(contacts.length) },
     { id: 'campaign', label: 'Campaign', meta: String(campaigns.length) },
     { id: 'compose', label: 'Compose', meta: `${rows.length} recipients` },
+    { id: 'senders', label: 'Senders', meta: sendersLoading ? 'loading' : String(senders.length) },
   ];
 
   return (
@@ -618,6 +620,8 @@ export function OutreachApp() {
             <ContactPanel contacts={filteredContacts} query={contactQuery} onQueryChange={setContactQuery} onAddContact={addContact} newlySavedContactId={newlySavedContactId} onUpdateContact={updateContact} onRemoveContact={removeContact} selectedContactIds={selectedContactIds} onToggleContact={toggleContactSelection} onToggleVisibleContacts={toggleVisibleContactSelection} onAddSelectedToCampaign={addSelectedContactsToCampaign} onImported={refreshContacts} statusFilter={contactStatusFilter} tagFilter={contactTagFilter} availableTags={availableContactTags} onStatusFilterChange={setContactStatusFilter} onTagFilterChange={setContactTagFilter} />
           </section>
         )}
+
+        {activeTab === 'senders' && <SenderManagement />}
 
         {activeTab === 'campaign' && (
           <section className="tabPane tabPaneWide">

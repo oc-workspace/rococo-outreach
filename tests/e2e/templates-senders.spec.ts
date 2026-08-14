@@ -31,6 +31,29 @@ test('exposes only senders from the configured allowed domain', async ({ page })
   expect(senders.some((sender) => sender.email === 'orphan@next2p.com')).toBe(false);
 });
 
+test('manages sender records inside the current workspace scope', async ({ page }) => {
+  await openTab(page, 'Senders');
+  await expect(page.getByRole('heading', { name: 'Sender management' })).toBeVisible();
+
+  const managementResponse = await page.request.get('/api/senders?management=true');
+  expect(managementResponse.status()).toBe(200);
+  const managementSenders = (await managementResponse.json()).data as Array<{ email: string; workspaceKey: string; teamKey: string }>;
+  expect(managementSenders.map((sender) => sender.email).sort()).toEqual(['orphan@next2p.com', 'winnie@next2p.com', 'zeta@next2p.com']);
+  expect(managementSenders.every((sender) => sender.workspaceKey === 'default' && sender.teamKey === 'outreach')).toBe(true);
+
+  await page.getByLabel('Display name', { exact: true }).fill('Pending UI Sender');
+  await page.getByLabel('Sender email', { exact: true }).fill('pending-ui@next2p.com');
+  await page.getByRole('button', { name: 'Add sender' }).click();
+  await expect(page.getByText('Sender created as inactive pending verification.')).toBeVisible();
+  await expect(page.getByText('pending-ui@next2p.com')).toBeVisible();
+
+  const created = (await page.request.get('/api/senders?management=true')).json();
+  const pending = (await created).data.find((sender: { email: string }) => sender.email === 'pending-ui@next2p.com');
+  expect(pending.status).toBe('inactive');
+  expect((await page.request.patch(`/api/senders/${pending.id}`, { data: { status: 'active' } })).status()).toBe(409);
+  expect((await page.request.delete(`/api/senders/${pending.id}`)).status()).toBe(200);
+});
+
 test('persists and reapplies a reusable template after refresh', async ({ page }) => {
   await page.getByLabel('Subject').fill('Persistent template subject');
   await page.getByLabel('Email body editor').fill('Persistent template body');

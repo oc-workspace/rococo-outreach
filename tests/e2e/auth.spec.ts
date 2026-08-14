@@ -8,6 +8,7 @@ test.beforeEach(async () => {
 test('requires login for pages and APIs', async ({ page }) => {
   const apiResponse = await page.request.get('/api/contacts');
   expect(apiResponse.status()).toBe(401);
+  expect((await page.request.get('/api/senders')).status()).toBe(401);
 
   await page.goto('/');
   await expect(page).toHaveURL(/\/login\?returnTo=/);
